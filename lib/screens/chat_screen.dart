@@ -27,9 +27,12 @@ class _ChatScreenState extends State<ChatScreen> {
   int _downloadProgress = 0;
   String? _error;
 
+  /// Subscription to the active generation stream — null when idle.
+  StreamSubscription<String>? _generationSubscription;
+
   // Default Gemma 2B model URL (MediaPipe's hosted .task file)
   static const _defaultModelUrl =
-      'https://huggingface.co/google/gemma-2b-it-tflite/resolve/main/gemma-2b-it-gpu-int4.bin';
+      'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm';
 
   @override
   void initState() {
@@ -119,9 +122,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _scrollToBottom();
 
-    try {
-      final buffer = StringBuffer();
-      await for (final token in widget.gemmaService.sendMessageStream(text)) {
+    final buffer = StringBuffer();
+    final stream = widget.gemmaService.sendMessageStream(text);
+
+    _generationSubscription = stream.listen(
+      (token) {
         buffer.write(token);
         if (mounted) {
           setState(() {
@@ -133,30 +138,62 @@ class _ChatScreenState extends State<ChatScreen> {
           });
           _scrollToBottom();
         }
-      }
+      },
+      onDone: () {
+        _finalizeGeneration(buffer.toString());
+      },
+      onError: (Object error) {
+        if (mounted) {
+          setState(() {
+            _messages.last = _ChatMessage(
+              text: buffer.isEmpty
+                  ? 'Error: $error'
+                  : buffer.toString(),
+              isUser: false,
+              isStreaming: false,
+            );
+            _isGenerating = false;
+            _error = 'Generation failed: $error';
+          });
+        }
+        _generationSubscription = null;
+      },
+      cancelOnError: false,
+    );
+  }
 
-      if (mounted) {
-        setState(() {
-          _messages.last = _ChatMessage(
-            text: buffer.toString(),
-            isUser: false,
-            isStreaming: false,
-          );
-          _isGenerating = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _messages.last = _ChatMessage(
-            text: 'Error: $e',
-            isUser: false,
-            isStreaming: false,
-          );
-          _isGenerating = false;
-          _error = 'Generation failed: $e';
-        });
-      }
+  /// Finalize the streaming message — called on normal completion.
+  void _finalizeGeneration(String text) {
+    if (mounted) {
+      setState(() {
+        _messages.last = _ChatMessage(
+          text: text,
+          isUser: false,
+          isStreaming: false,
+        );
+        _isGenerating = false;
+      });
+    }
+    _generationSubscription = null;
+  }
+
+  /// Stop the current generation — bound to the Stop button.
+  Future<void> _stopGeneration() async {
+    await _generationSubscription?.cancel();
+    _generationSubscription = null;
+    await widget.gemmaService.stopGeneration();
+
+    // Mark the last message as no longer streaming.
+    if (mounted && _messages.isNotEmpty) {
+      setState(() {
+        final last = _messages.last;
+        _messages.last = _ChatMessage(
+          text: last.text,
+          isUser: last.isUser,
+          isStreaming: false,
+        );
+        _isGenerating = false;
+      });
     }
   }
 
@@ -182,6 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _generationSubscription?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     widget.gemmaService.dispose();
@@ -255,6 +293,7 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _controller,
               isGenerating: _isGenerating,
               onSend: _sendMessage,
+              onStop: _stopGeneration,
             ),
         ],
       ),
@@ -448,11 +487,13 @@ class _InputBar extends StatelessWidget {
     required this.controller,
     required this.isGenerating,
     required this.onSend,
+    required this.onStop,
   });
 
   final TextEditingController controller;
   final bool isGenerating;
   final VoidCallback onSend;
+  final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -492,13 +533,9 @@ class _InputBar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           IconButton.filled(
-            onPressed: isGenerating ? null : onSend,
+            onPressed: isGenerating ? onStop : onSend,
             icon: isGenerating
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                ? const Icon(Icons.stop)
                 : const Icon(Icons.send),
           ),
         ],
