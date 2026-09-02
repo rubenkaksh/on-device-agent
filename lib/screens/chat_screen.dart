@@ -147,7 +147,9 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _messages.last = _ChatMessage(
-              text: buffer.isEmpty ? 'Error: $error' : buffer.toString(),
+              text: buffer.isEmpty
+                  ? 'Error: $error'
+                  : buffer.toString().trimRight(),
               isUser: false,
               isStreaming: false,
             );
@@ -166,7 +168,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) {
       setState(() {
         _messages.last = _ChatMessage(
-          text: text,
+          text: text.trimRight(),
           isUser: false,
           isStreaming: false,
         );
@@ -187,7 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         final last = _messages.last;
         _messages.last = _ChatMessage(
-          text: last.text,
+          text: last.text.trimRight(),
           isUser: last.isUser,
           isStreaming: false,
         );
