@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gemma_poc/services/gemma_service.dart';
 
 /// Chat screen for on-device Gemma inference.
@@ -203,6 +204,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Response copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -280,7 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
-                      return _MessageBubble(message: msg);
+                      return _MessageBubble(
+                        message: msg,
+                        onAssistantLongPress: msg.isUser
+                            ? null
+                            : () => _copyToClipboard(msg.text),
+                      );
                     },
                   ),
           ),
@@ -412,9 +428,10 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({required this.message, this.onAssistantLongPress});
 
   final _ChatMessage message;
+  final VoidCallback? onAssistantLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -453,12 +470,15 @@ class _MessageBubble extends StatelessWidget {
                 ),
               )
             else
-              Text(
-                message.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isUser
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurface,
+              GestureDetector(
+                onLongPress: isUser ? null : onAssistantLongPress,
+                child: Text(
+                  message.text,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: isUser
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
             if (message.isStreaming && message.text.isNotEmpty)
