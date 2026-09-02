@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_gemma_mediapipe/flutter_gemma_mediapipe.dart';
-
-import 'env_loader.dart';
 
 /// Stop tokens for Gemma models — generation halts when any is emitted.
 const List<String> _stopTokens = ['<end_of_turn>', '<eos>', '<start_of_turn>'];
@@ -44,7 +43,7 @@ class GemmaService {
   /// Initialize the FlutterGemma plugin. Call once at app startup.
   Future<void> initialize() async {
     if (_isInitialized) return;
-    final hfToken = await EnvLoader.get('HF_TOKEN');
+    final hfToken = dotenv.env['HF_TOKEN'];
     await FlutterGemma.initialize(
       huggingFaceToken: hfToken ?? '',
       inferenceEngines: [
