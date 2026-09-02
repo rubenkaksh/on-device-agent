@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemma generation cheat sheet</title>
+  <style>
+    :root { --ink:#17202a; --muted:#5c6873; --paper:#fffdf8; --blue:#155e75; --line:#d9e1e6; --soft:#eef7f8; --amber:#fff2cc; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#eaf0f2; font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:980px; margin:32px auto; padding:48px 56px; background:var(--paper); box-shadow:0 12px 38px #1630421c; }
+    h1,h2,h3 { line-height:1.15; letter-spacing:-.02em; }
+    h1 { margin:0 0 8px; font-size:2.5rem; color:var(--blue); }
+    h2 { margin-top:36px; padding-bottom:8px; border-bottom:2px solid var(--line); }
+    .lede { color:var(--muted); margin-top:0; font-size:1.1rem; }
+    .callout { padding:16px 18px; border-left:5px solid var(--blue); background:var(--soft); margin:20px 0; }
+    .warning { border-left-color:#c28b00; background:var(--amber); }
+    table { width:100%; border-collapse:collapse; margin:16px 0; }
+    th,td { text-align:left; vertical-align:top; border-bottom:1px solid var(--line); padding:12px 10px; }
+    th { background:#f1f5f6; }
+    code { background:#eef1f2; padding:2px 5px; border-radius:4px; }
+    pre { padding:16px; overflow:auto; background:#18232b; color:#f5fafb; border-radius:8px; }
+    a { color:var(--blue); font-weight:600; }
+    .small { color:var(--muted); font-size:.9rem; }
+    @media print { body { background:white; } main { margin:0; padding:0; box-shadow:none; max-width:none; } a { color:inherit; } }
+    @media (max-width:700px) { main { margin:0; padding:28px 20px; } h1 { font-size:2rem; } table { font-size:.92rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Gemma generation, without the mystery</h1>
+  <p class="lede">A field guide for the second-prompt <code>PredictDone</code> failure and the properties that shape a response.</p>
+
+  <h2>1. The lifecycle in one picture</h2>
+  <pre>addQueryChunk(prompt)
+        ↓
+generateResponseAsync()  ── native Predict is running ──→ tokens
+        ↓
+native done / cancellation completes
+        ↓
+addQueryChunk(next prompt)</pre>
+  <div class="callout warning"><strong>Invariant:</strong> the next <code>addQueryChunk</code> must happen only after the previous native prediction has reached its terminal state.</div>
+
+  <h2>2. What the error means</h2>
+  <p><code>PredictDone() AddQueryChunk should not be called before PredictDone</code> is a native state-machine error, not a bad prompt. The Dart stream and the native prediction are related but not identical. Closing or cancelling the Dart-side listener can detach Flutter before the native engine has finished unwinding.</p>
+  <p>In the D1 code, detecting <code>&lt;end_of_turn&gt;</code> used <code>break</code>. That ended the app's local loop immediately. The second tap then staged a new query while the first native <code>Predict</code> was still active.</p>
+  <p>The safe sequence is:</p>
+  <ol>
+    <li>request native cancellation when a stop token or Stop button is hit;</li>
+    <li>keep draining the native stream until it ends;</li>
+    <li>wait for the generation future to complete;</li>
+    <li>only then accept the next prompt.</li>
+  </ol>
+
+  <h2>3. The model-file trap</h2>
+  <p>Engine selection follows the registered model metadata. A URL ending in <code>.litertlm</code> must be installed as <code>ModelFileType.litertlm</code>. If the metadata says <code>task</code>, the app can route the same bytes through MediaPipe and format prompts differently.</p>
+  <p>Your log showed <code>fileType=task</code> while the app downloaded a <code>.litertlm</code> artifact. After changing the code, reinstall once: the old active model metadata does not rewrite itself automatically.</p>
+
+  <h2>4. Generation properties</h2>
+  <table>
+    <thead><tr><th>Property</th><th>Meaning</th><th>Practical effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>maxTokens</code></td><td>Total context window: system prompt + history + current input + generated output.</td><td>Larger values use more memory. Too small can truncate or fail. It is not simply “reply length.”</td></tr>
+      <tr><td><code>maxOutputTokens</code></td><td>Maximum number of tokens generated for one response.</td><td>Caps runaway replies while leaving the context window intact. The current app does not set it.</td></tr>
+      <tr><td><code>temperature</code></td><td>Scales the next-token probability distribution before sampling.</td><td>Low values, such as <code>0.2</code>, are steadier and more repeatable. Higher values are more varied and more error-prone.</td></tr>
+      <tr><td><code>topK</code></td><td>Restricts sampling to the K most likely next tokens.</td><td><code>40</code> removes unlikely choices but still permits variation among the likely ones.</td></tr>
+      <tr><td><code>randomSeed</code></td><td>Seeds the sampler's random choices.</td><td>Can improve repeatability, but does not promise byte-identical output across runtimes or changed history.</td></tr>
+      <tr><td>stop tokens</td><td>Special markers that signal an end of turn.</td><td>Prefer engine-level stopping. A Dart filter is a safety net and must still shut down native generation safely.</td></tr>
+      <tr><td><code>fileType</code></td><td>Describes the model artifact and selects prompt/engine behavior.</td><td>Keep the metadata, URL, and registered engine consistent.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. Diagnostic habit</h2>
+  <p>When a second-turn failure appears, log the boundaries—not every token:</p>
+  <pre>TURN 1: query staged
+TURN 1: native generation started
+TURN 1: stop requested
+TURN 1: native stream done
+TURN 1: generation future done
+TURN 2: query staged</pre>
+  <p>If “TURN 2: query staged” appears before “TURN 1: native stream done,” you have a lifecycle race. If the file type is wrong before generation starts, fix installation metadata first.</p>
+
+  <p class="small">Sources: <a href="https://pub.dev/packages/flutter_gemma">flutter_gemma</a>, <a href="https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference">Google AI Edge LLM Inference</a>, <a href="https://huggingface.co/docs/transformers/tokenizer_summary">Hugging Face tokenizer summary</a>. Continue with the <a href="../lessons/0001-second-prompt-lifecycle.html">short lesson</a>.</p>
+</main>
+</body>
+</html>
