@@ -6,17 +6,18 @@ import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_gemma_mediapipe/flutter_gemma_mediapipe.dart';
 
 /// Stop tokens for Gemma models — generation halts when any is emitted.
-const List<String> _stopTokens = [
-  '<end_of_turn>',
-  '<eos>',
-  '<start_of_turn>',
-];
+const List<String> _stopTokens = ['<end_of_turn>', '<eos>', '<start_of_turn>'];
 
 /// Service wrapping flutter_gemma for on-device Gemma inference.
 ///
 /// Handles model installation, loading, and chat with streaming responses.
 /// Supports stop-token guardrails and generation cancellation.
 class GemmaService {
+  GemmaService();
+
+  @visibleForTesting
+  GemmaService.forTesting(InferenceChat chat) : _chat = chat;
+
   InferenceModel? _model;
   InferenceChat? _chat;
 
@@ -27,8 +28,10 @@ class GemmaService {
   bool _isGenerating = false;
   bool get isGenerating => _isGenerating;
 
-  /// Controller exposed so callers can cancel an in-flight stream.
-  StreamController<String>? _activeController;
+  Future<void>? _generationFuture;
+  bool _stopRequested = false;
+
+  static const _modelFileType = ModelFileType.litertlm;
 
   /// Whether the service has been initialized (FlutterGemma.initialize called).
   bool get isInitialized => _isInitialized;
@@ -51,7 +54,8 @@ class GemmaService {
 
   /// Install and load the Gemma 2B model from a network URL.
   ///
-  /// [modelUrl] — URL to the .task model file (e.g. HuggingFace direct link).
+  /// [modelUrl] — URL to the `.litertlm` model file (e.g. HuggingFace direct
+  /// link).
   /// [onProgress] — optional callback with download progress 0-100.
   Future<void> installModel({
     required String modelUrl,
@@ -63,7 +67,7 @@ class GemmaService {
 
     await FlutterGemma.installModel(
       modelType: ModelType.gemmaIt,
-      fileType: ModelFileType.task,
+      fileType: _modelFileType,
     ).fromNetwork(modelUrl).withProgress(onProgress ?? (_) {}).install();
 
     _isModelLoaded = true;
@@ -72,7 +76,14 @@ class GemmaService {
   /// Check if a model is already installed (skip download).
   Future<bool> isModelInstalled() async {
     if (!_isInitialized) return false;
-    return FlutterGemma.hasActiveModel();
+    if (!FlutterGemma.hasActiveModel()) return false;
+
+    final activeModel =
+        FlutterGemmaPlugin.instance.modelManager.activeInferenceModel;
+    return switch (activeModel) {
+      InferenceModelSpec spec => spec.fileType == _modelFileType,
+      _ => false,
+    };
   }
 
   /// Load the active model and create a chat session.
@@ -101,17 +112,31 @@ class GemmaService {
     if (_chat == null) {
       throw StateError('Call loadChat() first.');
     }
+    if (_isGenerating) {
+      throw StateError('A generation is already in progress.');
+    }
 
     final controller = StreamController<String>();
-    _activeController = controller;
     _isGenerating = true;
+    _stopRequested = false;
+    final generationCompleter = Completer<void>();
+    _generationFuture = generationCompleter.future;
 
     () async {
       try {
-        await _chat!.addQuery(Message.text(text: userMessage, isUser: true));
+        final chat = _chat;
+        if (chat == null) {
+          throw StateError('Call loadChat() first.');
+        }
 
-        await for (final response in _chat!.generateChatResponseAsync()) {
-          if (controller.isClosed) break;
+        await chat.addQuery(Message.text(text: userMessage, isUser: true));
+
+        await for (final response in chat.generateChatResponseAsync()) {
+          if (controller.isClosed) {
+            _stopRequested = true;
+            await _requestNativeStop();
+            continue;
+          }
 
           if (response is TextResponse) {
             var token = response.token;
@@ -127,26 +152,35 @@ class GemmaService {
               }
             }
 
-            // Emit any remaining text before stopping.
-            if (token.isNotEmpty) {
+            // Emit any remaining text before stopping. Once cancellation has
+            // been requested, drain the native stream without forwarding any
+            // late tokens so its PredictDone lifecycle can finish.
+            if (!_stopRequested && token.isNotEmpty) {
               controller.add(token);
             }
 
             if (hitStop) {
-              debugPrint('GemmaService: Stop token detected — halting generation.');
-              break;
+              _stopRequested = true;
+              debugPrint(
+                'GemmaService: Stop token detected — halting generation.',
+              );
+              await _requestNativeStop();
             }
           }
         }
       } catch (e) {
-        if (!controller.isClosed) {
+        // Native cancellation may surface as a stream error on some engines;
+        // it is a normal completion path after a stop token or user cancel.
+        if (!_stopRequested && !controller.isClosed) {
           controller.addError(e);
         }
       } finally {
         _isGenerating = false;
-        _activeController = null;
         if (!controller.isClosed) {
           await controller.close();
+        }
+        if (!generationCompleter.isCompleted) {
+          generationCompleter.complete();
         }
       }
     }();
@@ -171,24 +205,29 @@ class GemmaService {
 
   /// Cancel the current generation stream.
   ///
-  /// Signals the native engine to stop and closes the token stream controller.
+  /// Signals the native engine to stop and waits for the stream to unwind.
   /// Safe to call when no generation is active (no-op).
   Future<void> stopGeneration() async {
     if (!_isGenerating) return;
 
-    // Signal the native engine to stop producing tokens.
+    _stopRequested = true;
+    final generationFuture = _generationFuture;
+    await _requestNativeStop();
+
+    // Do not expose the next prompt until the native stream has unwound. The
+    // MediaPipe session rejects addQueryChunk while its previous Predict call
+    // is still completing, even if the local Dart stream was already closed.
+    if (generationFuture != null) {
+      await generationFuture;
+    }
+  }
+
+  Future<void> _requestNativeStop() async {
     try {
       await _chat?.stopGeneration();
     } catch (e) {
       debugPrint('GemmaService: stopGeneration native call failed: $e');
     }
-
-    // Close the local stream controller.
-    if (_activeController != null && !_activeController!.isClosed) {
-      await _activeController!.close();
-    }
-    _isGenerating = false;
-    _activeController = null;
   }
 
   /// Clear conversation history and reset the chat session.

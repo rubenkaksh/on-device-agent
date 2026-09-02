@@ -146,9 +146,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _messages.last = _ChatMessage(
-              text: buffer.isEmpty
-                  ? 'Error: $error'
-                  : buffer.toString(),
+              text: buffer.isEmpty ? 'Error: $error' : buffer.toString(),
               isUser: false,
               isStreaming: false,
             );
@@ -179,9 +177,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Stop the current generation — bound to the Stop button.
   Future<void> _stopGeneration() async {
+    await widget.gemmaService.stopGeneration();
     await _generationSubscription?.cancel();
     _generationSubscription = null;
-    await widget.gemmaService.stopGeneration();
 
     // Mark the last message as no longer streaming.
     if (mounted && _messages.isNotEmpty) {
