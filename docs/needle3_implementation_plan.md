@@ -12,15 +12,17 @@
 | Model | Needle 3 — tool-calling / extraction model, 2-bit `.cact`, ~35 MB full depth (29–121M params), depths 2–20 layers via `needle build --layers N` |
 | Output | JSON: `function_calls`, `reasoning`, calibrated `confidence` [0–1]; calls < 0.1 go to `suppressed_calls`; off-topic → empty list |
 | Tools | JSON schema `{name, description, parameters}`. With **> 5 tools**, the engine retrieves and renders only the **top 5 per turn** (index persisted via `tool_index_path`) |
-| System prompt | Not a documented input. Guidance goes into tool names, descriptions, and schema constraints |
-| Fine-tuning | LoRA on attention projections, merged at export: `needle finetune` → `needle build --lora` |
-| **Mobile runtime** | ⚠️ Prebuilt engines listed only for macOS-arm64, linux-x86_64, WASM. C API mentioned. **No official Android/iOS build, and the `cactus` Flutter plugin does not list Needle.** Phase 0 resolves this. |
+| System | `system` takes **facts, not instructions** (`date`, `locale`, `device`, …). Guidance goes into tool names, descriptions, schema constraints and regex **`triggers`** |
+| Fine-tuning | LoRA, merged at export. ⚠️ **Local builds are 4-bit and drop the confidence head (`confidence: null`)**; platform fine-tunes keep it. The engine **cannot unload weights**, so a new model needs an app restart |
+| **Mobile runtime** | ✅ Prebuilt engines exist for `android-arm64`, `ios-arm64` and `ios-sim-arm64` (HF `Cactus-Compute/needle3`). The C API has 5 functions. There is no Flutter binding yet, so we build **`needle_flutter`** ourselves: see `needle_flutter_contribution_guide.md` |
 
 Target: flagship Android and iOS devices.
 
 ---
 
 ## Phase 0 — Runtime spike (decision gate)
+
+> **Superseded (2026-09-26):** mobile engines exist. Phase 0 is now the user-owned `needle_flutter` package (guide milestones M0–M7). Path A is the chosen path.
 
 **Goal:** Find out how Needle 3 will run inside Flutter on a phone before building anything else.
 
@@ -85,7 +87,7 @@ final class ActionTool {
 
 - **Fixed registry:** declared at build time; eligible for LoRA training (Phase 6).
 - **Runtime registry:** `register()` / `unregister()` while the app runs; declared to Needle in each call's context.
-- **Context filter:** send only the tools valid for the current screen or state. This keeps Needle's top-5 retrieval accurate.
+- **Context filter:** send only the tools valid for the current screen or state (≤ 5 is ideal). Needle has **one toolset per session**, so a context change calls `setTools` (which re-runs `needle_init`). Measure that cost.
 - **Serialiser:** `ActionTool` → Needle tool JSON.
 
 ### Tool-design rules (these replace a system prompt)
@@ -165,9 +167,10 @@ query
    needle finetune data/train.jsonl --epochs 10 --out adapter.safetensors
    needle build --lora adapter.safetensors --layers 20 --out needle3-app-vN.cact
    ```
-4. **Gate:** run the Phase 7 eval. Ship only if action accuracy and off-topic rejection both improve on the current model.
-5. **Ship:** upload the `.cact`, bump `manifest.json`, and let the app download it and keep the previous model for rollback.
-6. **Runtime tools are never trained.** They stay context-declared, and memory (B) covers them.
+4. **Confidence caveat:** locally built models report `confidence: null`. Either gate on memory hits and user confirmation for tuned models, or use `needle platform finetune`, which keeps the confidence head.
+5. **Gate:** run the Phase 7 eval. Ship only if action accuracy and off-topic rejection both improve on the current model.
+6. **Ship:** upload the `.cact`, bump `manifest.json`, and let the app download it, keep the previous model for rollback, and switch **on next launch** (the engine can't unload weights).
+7. **Runtime tools are never trained.** They stay context-declared, and memory (B) covers them.
 
 ---
 
