@@ -190,21 +190,6 @@ class GemmaService {
     return controller.stream;
   }
 
-  /// Send a user message and get the complete response (non-streaming).
-  Future<String> sendMessage(String userMessage) async {
-    if (_chat == null) {
-      throw StateError('Call loadChat() first.');
-    }
-
-    await _chat!.addQuery(Message.text(text: userMessage, isUser: true));
-    final response = await _chat!.generateChatResponse();
-
-    if (response is TextResponse) {
-      return response.token;
-    }
-    return '';
-  }
-
   /// Cancel the current generation stream.
   ///
   /// Signals the native engine to stop and waits for the stream to unwind.
