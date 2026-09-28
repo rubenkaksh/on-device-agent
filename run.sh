@@ -16,4 +16,11 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
+# .env is a bundled asset, so it must exist at build time. Create it from the
+# template on fresh clones; never overwrite an existing one.
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "Created .env from .env.example — set HF_TOKEN in .env if the model is gated."
+fi
+
 exec flutter "$@"

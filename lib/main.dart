@@ -5,7 +5,7 @@ import 'package:flutter_gemma_poc/services/gemma_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load();
+  await dotenv.load(isOptional: true);
   runApp(const GemmaPocApp());
 }
 

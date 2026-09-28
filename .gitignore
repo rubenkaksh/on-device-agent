@@ -45,4 +45,5 @@ app.*.map.json
 /android/app/release
 
 # Environment variables (secrets)
+# Environment secrets (real credentials — never commit; .env.example is the committed template)
 .env
