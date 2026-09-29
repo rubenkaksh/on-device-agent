@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 0002 · Gemma 3n under the hood</title>
+  <style>
+    :root { --ink:#17202a; --muted:#5d6b73; --paper:#fffdf8; --teal:#0f6170; --teal-dark:#084653; --mint:#e6f5f2; --blue:#e8f0fa; --gold:#b87900; --gold-bg:#fff3d4; --line:#d5e0e2; --code:#18242b; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(135deg,#e8f1f1,#f8eee0); font:16px/1.58 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    article { max-width:1120px; margin:38px auto; padding:52px 58px; background:var(--paper); box-shadow:0 18px 48px #23444b22; border-top:7px solid var(--teal); }
+    .eyebrow { color:var(--teal); font-size:.76rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+    h1,h2,h3 { line-height:1.15; letter-spacing:-.025em; }
+    h1 { max-width:800px; margin:8px 0 10px; color:var(--teal-dark); font-size:2.8rem; }
+    h2 { margin:42px 0 16px; color:var(--teal); font-size:1.65rem; }
+    h3 { margin:24px 0 8px; font-size:1.12rem; }
+    .lede { max-width:800px; margin:0; color:var(--muted); font-size:1.13rem; }
+    .callout { margin:22px 0; padding:17px 20px; border-left:5px solid var(--teal); background:var(--mint); }
+    .warning { border-left-color:var(--gold); background:var(--gold-bg); }
+    code { padding:2px 5px; border-radius:4px; background:#edf1f2; font-size:.94em; }
+    pre { overflow:auto; margin:16px 0; padding:16px; border-radius:9px; background:var(--code); color:#f3fafb; }
+    .diagram { overflow-x:auto; padding:12px; border:1px solid var(--line); border-radius:12px; background:#fbfdfc; }
+    svg { display:block; min-width:760px; width:100%; height:auto; }
+    .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+    table { width:100%; min-width:900px; border-collapse:collapse; }
+    th,td { padding:12px 13px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { color:var(--teal-dark); background:#edf5f5; font-size:.91rem; }
+    tr:last-child td { border-bottom:0; }
+    .tag { display:inline-block; padding:3px 8px; border-radius:999px; background:var(--blue); color:#234c76; font-size:.82rem; font-weight:700; }
+    .steps { counter-reset:step; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:0; list-style:none; }
+    .steps li { counter-increment:step; padding:15px 16px 15px 52px; position:relative; border:1px solid var(--line); border-radius:9px; background:#fff; }
+    .steps li::before { content:counter(step); position:absolute; left:16px; top:15px; display:grid; width:25px; height:25px; place-items:center; border-radius:50%; background:var(--teal); color:white; font-weight:800; }
+    .capabilities { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    .capability { padding:16px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+    .capability h3 { color:var(--teal-dark); }
+    details { margin:12px 0; padding:12px 15px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    summary { cursor:pointer; color:var(--teal-dark); font-weight:750; }
+    .experiment { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .experiment > div { padding:18px; border-radius:10px; background:#f5f8f8; }
+    a { color:var(--teal); font-weight:700; }
+    .footer { margin-top:42px; color:var(--muted); font-size:.91rem; }
+    @media print { body { background:white; } article { margin:0; padding:0; max-width:none; box-shadow:none; } .diagram { break-inside:avoid; } }
+    @media (max-width:760px) { article { margin:0; padding:32px 20px; } h1 { font-size:2.15rem; } .steps,.capabilities,.experiment { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<article>
+  <div class="eyebrow">Lesson 0002 · 15 minutes</div>
+  <h1>Gemma 3n: properties, capabilities, and the path of one token</h1>
+  <p class="lede">You already know how to load a model. This lesson connects the settings you change in Dart to the work performed by the model and native runtime.</p>
+
+  <div class="callout warning"><strong>Scope note:</strong> ranges below are practical starting points, not promises. The exact model artifact, quantization, engine, and device determine the result. See the <a href="../RESOURCES.md">source list</a> for the package and official references.</div>
+
+  <h2>1. The big picture</h2>
+  <p>Gemma does not produce a whole answer in one step. It repeatedly chooses the next token. The application supplies context and controls; the trained model supplies scores; the native runtime performs the high-volume numerical work. See the <a href="https://huggingface.co/docs/transformers/tokenizer_summary">tokenizer reference</a> for the text-to-token boundary and the <a href="https://huggingface.co/google/gemma-3n-E2B-it-litert-lm">Gemma 3n model card</a> for artifact-specific capabilities.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1040 610" role="img" aria-labelledby="diagram-title diagram-desc">
+      <title id="diagram-title">One Gemma response from Flutter to native inference and back</title>
+      <desc id="diagram-desc">The top lane shows the model computation from text through token IDs, transformer layers, logits, sampling, and detokenized text. The bottom lane shows Flutter TextField through GemmaService and InferenceChat to a native session, then back through a bridge as TextResponse chunks to the UI.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0f6170"/></marker>
+        <marker id="arrow-back" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#8b6500"/></marker>
+      </defs>
+      <rect x="10" y="10" width="1020" height="275" rx="16" fill="#e6f5f2" stroke="#9bc9c5" stroke-width="2"/>
+      <text x="34" y="46" fill="#084653" font-size="21" font-weight="800">MODEL COMPUTATION</text>
+      <text x="34" y="72" fill="#46636a" font-size="15">Native runtime: turns text into IDs, predicts scores, chooses one next ID.</text>
+      <g font-size="15" text-anchor="middle">
+        <rect x="35" y="112" width="125" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="97" y="143" fill="#17202a" font-weight="700">Formatted</text><text x="97" y="165" fill="#17202a">text</text>
+        <rect x="190" y="112" width="125" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="252" y="143" fill="#17202a" font-weight="700">Tokenizer</text><text x="252" y="165" fill="#17202a">→ IDs</text>
+        <rect x="345" y="112" width="145" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="417" y="143" fill="#17202a" font-weight="700">Transformer</text><text x="417" y="165" fill="#17202a">layers</text>
+        <rect x="520" y="112" width="125" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="582" y="143" fill="#17202a" font-weight="700">Logits</text><text x="582" y="165" fill="#17202a">scores</text>
+        <rect x="675" y="112" width="145" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="747" y="143" fill="#17202a" font-weight="700">Sampler</text><text x="747" y="165" fill="#17202a">settings</text>
+        <rect x="850" y="112" width="145" height="72" rx="10" fill="#fffdf8" stroke="#0f6170" stroke-width="2"/><text x="922" y="143" fill="#17202a" font-weight="700">Detokenizer</text><text x="922" y="165" fill="#17202a">→ chunk</text>
+      </g>
+      <g stroke="#0f6170" stroke-width="3" fill="none" marker-end="url(#arrow)"><path d="M160 148 H188"/><path d="M315 148 H343"/><path d="M490 148 H518"/><path d="M645 148 H673"/><path d="M820 148 H848"/></g>
+      <path d="M922 197 C922 245 747 250 747 197" fill="none" stroke="#8b6500" stroke-width="3" marker-end="url(#arrow-back)"/>
+      <text x="835" y="248" fill="#8b6500" font-size="14" text-anchor="middle">repeat for next token</text>
+      <rect x="10" y="315" width="1020" height="275" rx="16" fill="#eaf1fb" stroke="#a7bfdc" stroke-width="2"/>
+      <text x="34" y="351" fill="#234c76" font-size="21" font-weight="800">FLUTTER / DART RUNTIME</text>
+      <text x="34" y="377" fill="#526b83" font-size="15">Application: stages prompts, receives decoded chunks, and renders them.</text>
+      <g font-size="15" text-anchor="middle">
+        <rect x="35" y="417" width="125" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="97" y="448" fill="#17202a" font-weight="700">TextField</text><text x="97" y="470" fill="#17202a">prompt</text>
+        <rect x="190" y="417" width="145" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="262" y="448" fill="#17202a" font-weight="700">GemmaService</text><text x="262" y="470" fill="#17202a">buffer</text>
+        <rect x="365" y="417" width="145" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="437" y="448" fill="#17202a" font-weight="700">InferenceChat</text><text x="437" y="470" fill="#17202a">API</text>
+        <rect x="540" y="417" width="145" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="612" y="448" fill="#17202a" font-weight="700">Native session</text><text x="612" y="470" fill="#17202a">engine</text>
+        <rect x="715" y="417" width="145" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="787" y="448" fill="#17202a" font-weight="700">Bridge</text><text x="787" y="470" fill="#17202a">EventChannel / FFI</text>
+        <rect x="890" y="417" width="105" height="72" rx="10" fill="#fffdf8" stroke="#234c76" stroke-width="2"/><text x="942" y="448" fill="#17202a" font-weight="700">UI</text><text x="942" y="470" fill="#17202a">text</text>
+      </g>
+      <g stroke="#234c76" stroke-width="3" fill="none" marker-end="url(#arrow)"><path d="M160 453 H188"/><path d="M335 453 H363"/><path d="M510 453 H538"/><path d="M685 453 H713"/><path d="M860 453 H888"/></g>
+      <path d="M890 525 H160" fill="none" stroke="#8b6500" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#arrow-back)"/>
+      <text x="525" y="553" fill="#8b6500" font-size="14" text-anchor="middle">TextResponse(chunk) travels back; Dart usually receives text, not integer IDs</text>
+    </svg>
+  </div>
+
+  <h2>2. How Flutter and Dart communicate with the model</h2>
+  <ol class="steps">
+    <li><strong>Create a message.</strong> The app creates <code>Message.text</code> from the user's input.</li>
+    <li><strong>Format the conversation.</strong> <code>transformToChatPrompt</code> applies formatting based on model and <code>fileType</code>.</li>
+    <li><strong>Stage the query.</strong> <code>InferenceChat.addQuery</code> calls the native session's <code>addQueryChunk</code>.</li>
+    <li><strong>Start prediction.</strong> <code>generateChatResponseAsync</code> asks the session for a response stream.</li>
+    <li><strong>Cross the bridge.</strong> MediaPipe commonly uses an EventChannel; LiteRT-LM uses its FFI/native stream path.</li>
+    <li><strong>Wrap the chunk.</strong> The package turns a returned string chunk into <code>TextResponse(chunk)</code>.</li>
+    <li><strong>Render it.</strong> The app writes <code>response.token</code> into a buffer and rebuilds the response bubble.</li>
+  </ol>
+  <div class="callout"><strong>Subtle but useful:</strong> “token” in the Dart API often means a decoded text chunk. It may represent part of a word, one tokenizer token, or several tokenizer tokens. The native tokenizer and detokenizer usually own the integer-ID conversion.</div>
+  <p>This is also where yesterday's bug lived: the Dart stream could look finished while native prediction was still unwinding. The stream is an observation channel; native session state decides when the next query is safe. Review <a href="0001-second-prompt-lifecycle.html">Lesson 0001</a> for that lifecycle boundary, and compare the package's <a href="https://pub.dev/packages/flutter_gemma">streaming API</a> with the official <a href="https://developers.google.com/edge/mediapipe/solutions/genai/llm_inference">Google AI Edge LLM Inference</a> concepts.</p>
+
+  <h2>3. Properties and their practical ranges</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Property</th><th>Practical range / constraint</th><th>Lower end</th><th>Higher end</th><th>Performance and quality effect</th><th>Start here</th></tr></thead>
+      <tbody>
+        <tr><td><code>temperature</code></td><td>Commonly <code>0.0–2.0</code>; exact support is runtime-dependent.</td><td>More predictable and conservative.</td><td>More varied; can become incoherent or repetitive in a different way.</td><td>Mostly changes selection behavior, not model size. High values can increase retries or unusable output.</td><td><code>0.2</code> for stable chat.</td></tr>
+        <tr><td><code>topK</code></td><td>Integer <code>≥ 1</code>; upper bound is the vocabulary size.</td><td>Small candidate set; <code>1</code> is close to greedy selection.</td><td>More candidates remain eligible.</td><td>Controls diversity after logits are computed. Very large values allow unlikely choices.</td><td><code>40</code>.</td></tr>
+        <tr><td><code>topP</code></td><td>Usually <code>0.0–1.0</code>; probability-mass cutoff.</td><td>Only the most probable mass is considered.</td><td>More of the distribution is considered.</td><td>Adaptive alternative/complement to top-k. High values increase variation; interactions depend on runtime.</td><td>Leave unset until top-k is understood.</td></tr>
+        <tr><td><code>randomSeed</code></td><td>Integer.</td><td>Same seed can make repeated trials easier to compare.</td><td>Different seeds explore different samples.</td><td>Does not change compute capacity. Reproducibility is not guaranteed across devices, runtimes, or changed history.</td><td><code>1</code> for experiments.</td></tr>
+        <tr><td><code>maxTokens</code></td><td>Model/runtime context limit. LiteRT-LM requires at least <code>1024</code> in this package.</td><td>Less room for history, input, and output.</td><td>More context, with greater memory pressure.</td><td>Large contexts increase prefill work and memory. It is the whole budget, not reply length alone.</td><td><code>1024</code> minimum; raise only when needed.</td></tr>
+        <tr><td><code>maxOutputTokens</code></td><td>Positive per-response cap, bounded by available context.</td><td>Short, faster replies.</td><td>Longer replies and more latency.</td><td>Directly bounds decode work and helps prevent runaway answers without shrinking history capacity.</td><td>Add a modest cap for a chat UI.</td></tr>
+        <tr><td><code>tokenBuffer</code></td><td>Safety margin used by <code>InferenceChat</code> when managing context.</td><td>More usable context, less safety headroom.</td><td>History is trimmed/rebuilt earlier.</td><td>Conservative buffer trades some context capacity for fewer context-overflow surprises.</td><td>Package default <code>256</code>.</td></tr>
+        <tr><td>Stop tokens</td><td>Model-specific strings such as <code>&lt;end_of_turn&gt;</code>.</td><td>Earlier end; risk of truncation if configured incorrectly.</td><td>Missing/late stop; risk of over-generation or leaked markup.</td><td>Native stopping is best. Dart filtering is a safety net and must still wait for native completion.</td><td>Use the model's documented markers.</td></tr>
+        <tr><td><code>preferredBackend</code></td><td>CPU, GPU, or NPU where the artifact/platform supports it.</td><td>Usually broad compatibility.</td><td>Potentially faster or more efficient acceleration.</td><td>Changes throughput, startup, battery, and compatibility—not the learned behavior itself.</td><td>CPU for a reliable baseline.</td></tr>
+        <tr><td><code>supportImage</code> / <code>supportAudio</code></td><td>Boolean, only when the exact artifact and engine support the modality.</td><td>Text-only path.</td><td>Multimodal preprocessing and inference.</td><td>More memory, preprocessing, and latency; capability is artifact/runtime-dependent.</td><td>Verify the model card before enabling.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout"><strong>Diagnostic rule:</strong> change one family at a time. If output is unstable, inspect sampling. If replies are cut off, inspect output/context budgets. If prompt two crashes, inspect lifecycle ordering. Do not use temperature to diagnose a native session race.</div>
+
+  <h2>4. Gemma 3n capabilities to explore</h2>
+  <p>Gemma 3n is an on-device model family with modality and runtime support that varies by artifact. Treat each row as an experiment proposal, not an automatic guarantee for your E2B file.</p>
+  <div class="capabilities">
+    <div class="capability"><span class="tag">baseline</span><h3>Text chat</h3><p>Ask the same question at <code>0.2</code>, <code>0.7</code>, and a higher temperature. Observe consistency, creativity, repetition, and useful detail.</p></div>
+    <div class="capability"><span class="tag">context</span><h3>Conversation history</h3><p>Ask the model to remember a detail across turns. Increase history gradually and observe latency, truncation, and context limits.</p></div>
+    <div class="capability"><span class="tag">vision*</span><h3>Image understanding</h3><p>Send an image with a specific question. Compare broad descriptions with questions about small details. Confirm <code>supportImage</code> and artifact support first.</p></div>
+    <div class="capability"><span class="tag">audio*</span><h3>Audio understanding</h3><p>Try a short supported audio input and compare clear speech with background noise. Confirm exact variant and engine support first.</p></div>
+    <div class="capability"><span class="tag">runtime</span><h3>Streaming and cancellation</h3><p>Measure time-to-first-chunk, total response time, and safe cancellation. Send a second prompt only after native completion.</p></div>
+    <div class="capability"><span class="tag">model</span><h3>Quantization trade-offs</h3><p>Compare available model sizes or quantizations. Record memory, speed, answer quality, and modality support.</p></div>
+    <div class="capability"><span class="tag">hardware</span><h3>Backend comparison</h3><p>Compare CPU with an available accelerator using the same prompt and seed. Measure speed and battery/thermal behavior.</p></div>
+    <div class="capability"><span class="tag">application</span><h3>Structured output</h3><p>Ask for JSON, parse it in Dart, and display validation errors. This tests application reliability rather than adding a new model capability.</p></div>
+    <div class="capability"><span class="tag">privacy</span><h3>Offline operation</h3><p>Install first, disable network, and test text inference. Separate model execution from downloads, telemetry, and app-level services.</p></div>
+  </div>
+  <p class="small">* Vision/audio support must be checked against the exact model card and Flutter engine. A model family having a capability does not mean every converted artifact exposes it through every backend.</p>
+
+  <h2>5. A controlled experiment</h2>
+  <div class="experiment">
+    <div><h3>Keep constant</h3><ul><li>same model artifact and file type;</li><li>same prompt and conversation history;</li><li>same backend and random seed;</li><li>same device state where possible.</li></ul></div>
+    <div><h3>Record</h3><ul><li>time to first chunk;</li><li>total response time;</li><li>output token count/length;</li><li>repetition, truncation, and usefulness;</li><li>memory or thermal symptoms.</li></ul></div>
+  </div>
+  <p>Run one baseline, change one setting, and repeat. Your result is evidence about that model/runtime/device combination—not a universal rule.</p>
+
+  <h2>6. Check your understanding</h2>
+  <details><summary>1. Where are text characters converted into integer token IDs?</summary><p>Usually inside the native runtime's tokenizer, after Dart has formatted and staged the prompt.</p></details>
+  <details><summary>2. Does <code>response.token</code> always mean exactly one model token?</summary><p>No. In this Dart API it is commonly decoded text returned as a chunk; a chunk can contain part of a word or multiple tokenizer tokens.</p></details>
+  <details><summary>3. Which settings change the choice among next-token candidates?</summary><p><code>temperature</code>, <code>topK</code>, <code>topP</code>, and the random seed influence sampling. They do not enlarge the context window.</p></details>
+  <details><summary>4. What is the difference between <code>maxTokens</code> and <code>maxOutputTokens</code>?</summary><p><code>maxTokens</code> is the whole context budget; <code>maxOutputTokens</code> caps the new response.</p></details>
+  <details><summary>5. Why can a Dart stream look finished while native inference is not?</summary><p>The Dart stream is an observation/communication channel. Native prediction has its own completion state; cancellation or stream detachment may happen before native <code>PredictDone</code>.</p></details>
+  <details><summary>6. What must happen before prompt two is staged?</summary><p>The first native generation must complete or be cancelled and fully unwind. Then—and only then—call <code>addQueryChunk</code> for prompt two.</p></details>
+
+  <p class="footer">Ask your teacher about anything unclear. Continue with the <a href="0001-second-prompt-lifecycle.html">lifecycle lesson</a>, the <a href="../reference/gemma-generation-cheat-sheet.html">printable reference</a>, the <a href="../MISSION.md">mission</a>, and <a href="../RESOURCES.md">trusted resources</a>.</p>
+</article>
+</body>
+</html>
