@@ -12,16 +12,19 @@ Route (from that guide): **(1) open an issue on `cactus-compute/needle` -> (2) b
 own `needle_flutter` package -> (3) offer it upstream once the maintainers agree.**
 v1 and v2 of this file ignored that work; they were wrong and are replaced.
 
-## No-AI rule (applies to every step)
+## AI-assistance rules
 
-Cactus `CONTRIBUTING.md` (main `cactus` repo): *"Do not blindly PR AI slop, this codebase is very
-complex, they miss details."* Also: `cactus test` must pass, DCO sign-off (`git commit -s`), focused
-PRs tied to an issue. The `needle` repo has no CONTRIBUTING.md; the guide assumes the same norms.
-(Wording fetched 2026-09-30 through a summarising tool: read the file and copy it exactly.)
+Canonical text: `docs/needle_flutter_handoff.md` section 4 on the same branch (read it first).
+Cactus `CONTRIBUTING.md` (main `cactus` repo, verified verbatim there): *"AI-Generated Code: Do not
+blindly PR AI slop, this codebase is very complex, they miss details."* It is a warning, not a ban;
+it does not cover the `needle` repo (no CONTRIBUTING) or your own package. The working rules are
+stricter because you want this to be your contribution:
 
-- You write the package code. Claude explains, reviews diffs, hunts FFI memory bugs, and may write
-  test scaffolding, CI YAML and README prose only if you ask and mark it clearly (guide section 12).
-- Everything must be run by you on real devices before you claim it in the issue or PR.
+- **You write** the core code of `needle_flutter` (bindings, isolate protocol, native loading, public
+  API) and anything sent upstream. Claude explains, reviews diffs, hunts FFI lifetime bugs.
+- Test scaffolding, CI YAML, README prose, example boilerplate: only on request, marked in the commit message.
+- Never add `Signed-off-by` (DCO) for you. Disclose AI help in upstream PRs.
+- The package lives in a **separate repo**, not in `on-device-agent`. Tasklog card N0 is parked (user-owned).
 
 ## Corrections and additions to the guide (found 2026-09-30)
 
@@ -44,9 +47,8 @@ PRs tied to an issue. The `needle` repo has no CONTRIBUTING.md; the guide assume
    upstream offer (M9) means a new binding beside it; ask in Q8.
 5. **Platform naming:** the guide uses `needle build --platform android-arm64|ios-arm64|ios-sim-arm64`;
    the server_base spike used `macos-arm64`. Same command works for macOS.
-6. Handoff file `/Users/rubenk/Downloads/needle_flutter_handoff.md` could not be read by Claude
-   (EPERM, macOS privacy). Its contents are **not** reflected here. Copy it into the repo or
-   grant access, then reconcile.
+6. The handoff (`docs/needle_flutter_handoff.md`) is on the same branch; its rules above and
+   its milestones M0-M9 are what this schedule follows.
 
 ## Day 1: explore and open the issue (guide M0, M1)
 
