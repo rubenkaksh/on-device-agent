@@ -154,7 +154,7 @@ Record in `docs/sessions/<date>.md`:
 
 ## 5. Step 2: Open the issue (before or right after Step 1)
 
-Use the draft in `docs/needle_issue_draft.md`. Fill in the Step 1 results so the issue is concrete. The `needle` repo has **no CONTRIBUTING.md**. The main `cactus` repo's CONTRIBUTING asks for **no AI-generated code**, a **DCO sign-off**, and **focused PRs tied to an issue**. Assume the same norms apply to `needle`, and ask in the issue.
+Use the draft in `docs/needle_issue_draft.md`. Fill in the Step 1 results so the issue is concrete. The `needle` repo has **no CONTRIBUTING.md**. The main `cactus` repo's CONTRIBUTING says *"Do not blindly PR AI slop, this codebase is very complex, they miss details"* (a warning against unreviewed AI code, not a ban), and requires a **DCO sign-off** and **focused PRs tied to an issue**. Assume the same norms apply to `needle`, and ask in the issue. Full policy notes: `docs/needle_flutter_handoff.md` §4.
 
 ---
 
