@@ -1,98 +1,87 @@
-# Needle 3 for Flutter on the Cactus package: 2-day guide (v2, 2026-09-30)
+# needle_flutter: 2-day schedule (v3, 2026-09-30)
 
-Supersedes v1, which wrongly framed this as "contribute to Needle issues". The goal is to
-**integrate Needle 3 into the Cactus Flutter binding**, building on the FFI work already done in
-`server_base`.
+This file is only the **2-day schedule**. The full guide already exists on branch
+`origin/docs/needle3-plan`:
 
-## Rule zero: Cactus's AI policy
+- `docs/needle_flutter_contribution_guide.md` (canonical: engine surface, skills gap, toolchain,
+  package layout, API design, compliance, testing, milestones M0-M9)
+- `docs/needle_issue_draft.md` (issue to post on `cactus-compute/needle`)
+- `docs/needle3_implementation_plan.md` (app-side plan, Phases 0-8)
 
-`cactus-compute/cactus` `CONTRIBUTING.md` says: *"Do not blindly PR AI slop, this codebase is very
-complex, they miss details."* It also says a PR that fails to build is "the biggest red flag, means
-it was not tested" and requires DCO sign-off (`git commit -s`), which certifies you wrote it or have
-the right to submit it.
+Route (from that guide): **(1) open an issue on `cactus-compute/needle` -> (2) build and publish your
+own `needle_flutter` package -> (3) offer it upstream once the maintainers agree.**
+v1 and v2 of this file ignored that work; they were wrong and are replaced.
 
-(Fetched 2026-09-30 through a summarising tool. Read the file yourself before day 1 and copy the
-exact wording. No note of this policy exists in memory; the memory dirs only hold the on-device-AI
-goal. Save a note once you have read it.)
+## No-AI rule (applies to every step)
 
-How to work under it:
-- **You write every line of the PR.** Claude explains code, traces the FFI, reviews your diff and
-  answers questions; it does not author diff hunks you paste in.
-- Understand every line you submit well enough to defend it in review.
-- Run everything yourself on a real device. "Builds, and I ran it on iPhone/macOS" goes in the PR.
-- Ask upstream first (issue or Discord) whether Needle 3 in the Flutter binding is wanted and how
-  they want it shaped. A surprise large PR is the worst case under this policy.
+Cactus `CONTRIBUTING.md` (main `cactus` repo): *"Do not blindly PR AI slop, this codebase is very
+complex, they miss details."* Also: `cactus test` must pass, DCO sign-off (`git commit -s`), focused
+PRs tied to an issue. The `needle` repo has no CONTRIBUTING.md; the guide assumes the same norms.
+(Wording fetched 2026-09-30 through a summarising tool: read the file and copy it exactly.)
 
-## Intel (verified 2026-09-30 unless marked)
+- You write the package code. Claude explains, reviews diffs, hunts FFI memory bugs, and may write
+  test scaffolding, CI YAML and README prose only if you ask and mark it clearly (guide section 12).
+- Everything must be run by you on real devices before you claim it in the issue or PR.
 
-| Fact | Source |
-|---|---|
-| `cactus-compute/cactus-flutter` was **archived 2026-07-24**, read-only. | GitHub page |
-| The `cactus` pub.dev package is v1.3.0, ~9 months old, predates Needle 2. | server_base `learn/slm-decisions.md` (Round 4) |
-| The main repo `cactus-compute/cactus` has `bindings/flutter/` with just `README.md` + `cactus.dart`, raw Dart FFI over `cactus_engine.h` (`cactusInit`, `cactusComplete`, streaming transcribe). **No Needle mention.** | GitHub page |
-| Native libs are prebuilt: `cactus build --apple` / `--android` -> `cactus-ios.xcframework`, `cactus-macos.xcframework`, `libcactus_engine.so`. | bindings/flutter README |
-| Needle 3 (HF `Cactus-Compute/needle3` @ `b274efcb`, 2026-09-19) is a separate `needle3.cact` weights file loaded via `needle_load`. C header is a superset of Needle 2: `needle_load`, `needle_init`, `needle_complete`, `needle_reset` + `needle_last_error`, `needle_embed`. | server_base `learn/slm-decisions.md` |
-| Needle ships its own prebuilt engines: `needle build --platform <folder> [--layers N]`, artifacts `libneedle.a` for `macos-arm64`, `ios-arm64`. Porting guide: `cactuscompute.com/blog/porting-needle`. | needle README, porting guide |
-| A hand-rolled `NeedleBindings` + FFI engine already works against `libneedle`: `server_base/server_base_flutter/lib/features/assistant/needle/{needle_bindings,needle_engine,needle_engine_ffi}.dart`, plus `tool/fetch_needle.sh` (pins needle3 @ b274efcb, sha256-checked). | local files |
-| Measured: base Needle 3 = 13/23 (14/23 with placeholder schema) on the 23-phrase todo eval, no better than Needle 2. | slm-decisions.md |
+## Corrections and additions to the guide (found 2026-09-30)
 
-## Open questions to settle before writing code (day 1 morning)
+1. **You already have a working prototype.** `server_base` (`/Users/rubenk/projects/infra/server_base`)
+   has hand-rolled FFI to `libneedle`:
+   `server_base_flutter/lib/features/assistant/needle/{needle_bindings,needle_engine,needle_engine_ffi}.dart`
+   and `tool/fetch_needle.sh` (pins HF `Cactus-Compute/needle3` @ `b274efcb`, sha256-checked,
+   macos-arm64 + ios-arm64 `libneedle.a`). It answers M2 partly and Q1: on macOS/iOS the engine
+   shipped as a **static `libneedle.a`**, so the iOS/macOS route is static linking (guide section 3
+   `-force_load`, `DynamicLibrary.process()`), not a dylib. Confirm for Android in Step 1.
+2. **`needle_last_error` exists** in the Needle 3 header (needle_embed too). The guide lists five
+   functions; the server_base notes list `needle_last_error` as a sixth. Check the header from
+   `needle build --platform`. It may replace reading the error from the output buffer (guide Q4).
+3. **Measured facts to reuse** (`server_base/learn/slm-decisions.md`): `confidence` is
+   uncalibrated on Needle 2 (0.002-0.009 when correct); one process-global conversation; base Needle 3
+   scored 13/23 (14/23 placeholder schema) on the 23-phrase todo eval. Needle 2 spike: 70-120 ms per
+   query, 22-28 MB RAM. Do not gate on confidence; if you ship it, say so in the README.
+4. **`cactus-flutter` is archived** (2026-07-24), and pub.dev `cactus` is v1.3.0 (predates Needle 2).
+   `cactus/bindings/flutter` is just `cactus.dart` over `cactus_engine.h`, with no Needle. So an
+   upstream offer (M9) means a new binding beside it; ask in Q8.
+5. **Platform naming:** the guide uses `needle build --platform android-arm64|ios-arm64|ios-sim-arm64`;
+   the server_base spike used `macos-arm64`. Same command works for macOS.
+6. Handoff file `/Users/rubenk/Downloads/needle_flutter_handoff.md` could not be read by Claude
+   (EPERM, macOS privacy). Its contents are **not** reflected here. Copy it into the repo or
+   grant access, then reconcile.
 
-1. **What exactly is the contribution?** Assumed here: add Needle 3 support to Cactus's Flutter
-   binding (`bindings/flutter` in the main repo, or a revived pub package). Alternatives: PR a new
-   `needle` Dart binding beside `cactus.dart`; or publish your own package. Confirm with upstream.
-2. Does `cactus_engine.h` (the Cactus engine) load `.cact` Needle weights, or is Needle a separate
-   engine (`libneedle`, different header)? The server_base spike used `libneedle`, and Cactus's
-   Flutter binding wraps `cactus_engine.h`. They may be two different C APIs. **Read both headers
-   first**; this decides the whole design.
-3. Which platforms? server_base targets iOS device + macOS arm64 only. Android needs `.so`
-   artifacts; check whether Needle publishes them (needle issue #17 asks about Android).
-4. Does upstream want streaming, embeddings (`needle_embed`), and layer selection (2-20) exposed
-   in v1, or only `load/init/complete/reset`? Start with the four core calls.
+## Day 1: explore and open the issue (guide M0, M1)
 
-## Day 1: understand and design (no PR code yet)
+1. Read the guide end to end, plus `llms.txt`, `needle/__init__.py`, `needle/_worker.py`,
+   `tests/test_worker.py` in `cactus-compute/needle`.
+2. Toolchain (guide section 3): Xcode, NDK + CMake, `brew install llvm`, Python venv with
+   `cactus-needle`, `NEEDLE_TELEMETRY=0`. Devices: one Android arm64 phone, one iPhone.
+3. Run guide Step 1 (section 4): Python reference, `needle build` for android-arm64, ios-arm64,
+   ios-sim-arm64 (and macos-arm64), inspect `file`, `llvm-nm`, `readelf -l`, the header. Record in
+   `docs/sessions/2026-09-30.md`.
+4. Re-read your `server_base` bindings next to the header; note what carries over to the package.
+5. Answer Q1, Q4, Q6, Q7 (guide section 10). Fill and **post yourself** the issue draft; it asks
+   the AI-policy question (Q8) explicitly.
+6. Check `needle_flutter` name availability on pub.dev.
 
-1. Read `CONTRIBUTING.md` and `DCO.md` in `cactus-compute/cactus`. Note the exact AI wording.
-2. Fork and clone `cactus-compute/cactus`. Run `cactus test` on unmodified `main` first, so you know
-   the baseline (per CONTRIBUTING). Note the exact command and which platform flags you need.
-3. Read `bindings/flutter/cactus.dart` end to end. Write down how it loads the library per platform
-   and how it maps C strings and errors.
-4. Read your own working code: `needle_bindings.dart` (typedefs, `lookupFunction`), `needle_engine_ffi.dart`
-   (lifecycle, buffer sizes, `needle_last_error`). This is your reference implementation; your PR
-   should be a cleaned-up, tested version of ideas you already understand.
-5. Read `needle.h` from the needle3 artifacts (`fetch_needle.sh` downloads it). List every function
-   and its ownership rules (who allocates `out`, meaning of negative returns).
-6. Answer the four open questions above. Post one short issue or Discord message describing the
-   plan and asking whether they want it. Wait for signal before day 2 code.
-7. Write a one-page design in your own words: file layout, public Dart API, error type, how the
-   native artifact is bundled, test plan. Keep it in `docs/`, not in the PR.
+Done when: section 4 results are on disk and the issue is posted.
 
-## Day 2: implement, test on device, PR
+## Day 2: macOS binding and skeleton (guide M2, part of M3)
 
-1. Branch from `main` in your fork: `git switch -c feat/needle3-flutter-binding`.
-2. Write the Dart binding yourself, smallest slice first: `needle_load` -> `needle_init` ->
-   `needle_complete` -> `needle_reset`, with `needle_last_error` mapped to an exception.
-3. Wire the native artifact for **one platform first** (macOS arm64, since it is the easiest to
-   iterate on). Prove a tool call comes back for one phrase ("add buy milk").
-4. Add tests next to the existing ones in the repo (mirror their style; check `cactus test`).
-   Include: load failure, empty `function_calls` (correct refusal), and a multi-call output.
-5. Add iOS: `ios-arm64/libneedle.a`, run on a real device. Record what you ran.
-6. Update the docs for the new API (`bindings/flutter/README.md`). CONTRIBUTING requires it for
-   user-facing changes.
-7. Run `cactus test` plus your device runs. Commit with `git commit -s` (DCO).
-8. Open the PR: focused scope, link the issue, state what you ran on which device, and the tradeoffs
-   you chose. Do not submit anything you cannot explain.
+1. `flutter create --template=plugin_ffi --platforms=android,ios,macos needle_flutter`.
+2. `ffigen` from the downloaded header (`ffigen.yaml`, commit `bindings.g.dart`).
+3. Write `native_library.dart` and the four core calls (`load`, `init`, `complete`, `reset`) plus
+   `embed` on macOS first, then a Dart test against the real engine. Reuse understanding from
+   `needle_engine_ffi.dart`, not a copy-paste: you must be able to explain every line.
+4. Keep the weights byte buffer alive for the whole session until Q2 is answered.
+5. Parity check: same query and tools through Python `needle` and Dart, diff the JSON envelopes.
+6. Start `needle_isolate.dart` (one worker isolate owns the engine, serialised calls).
 
-## Pitfalls
+Done when: a Dart test on macOS returns a tool call from the real engine and matches the Python output.
+Later milestones (M4 Android, M5 iOS, M6 wrapper parity, M7 publish) follow the guide.
 
-- `confidence` is uncalibrated (correct answers at 0.002-0.009). Never expose it as a gate.
-- Needle keeps **one process-global conversation**; document `needle_reset` and make the Dart API
-  non-reentrant or serialised.
-- Multi-call outputs occur ("cross off call mom" -> complete + add). The API must return a list.
-- Descriptions are part of the product, and the Needle README says system-prompt facts "do not steer
-  the model". Do not promise accuracy in the PR text; quote the measured 13/23.
-- Weights (`needle3.cact`, 13.5 MB libs) do not go into git. Fetch with a pinned, hashed script like
-  `fetch_needle.sh`.
-- Upstream moves fast (Needle 3 announced 2026-09-17): re-check `main` at the start of each day.
-- The needle repo itself (`cactus-compute/needle`) is Python; issues #31/#33 are not relevant to
-  this goal. v1 of this guide suggested them by mistake.
+## Pitfalls (see guide sections 7-8)
+
+- One global engine per process; weights cannot be unloaded; one toolset per session
+  (`setTools` re-runs `needle_init`).
+- Telemetry is on in the binary; verify with a proxy that opt-out works on mobile.
+- Do not bundle `needle3.cact`; fetch with a pinned, hashed script.
+- Prebuilt `.so` alignment (16 KB) is not fixable by you; report it in the issue.
