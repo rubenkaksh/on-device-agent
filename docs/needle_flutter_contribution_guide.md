@@ -20,6 +20,8 @@ Research date: 2026-09-26, against `cactus-compute/needle` `main` (engine 3.0.2)
 | Swap models at runtime | **The engine cannot unload weights.** Once a tuned `.cact` is loaded, the process is stuck with it | `llms.txt` → *Common mistakes* |
 | Tools can change per call | **One toolset per session.** Changing tools means calling `needle_init` again | `llms.txt` → *Behaviour contract* |
 
+> **M0 correction (2026-10-02):** `needle build --platform android-arm64` yields a static `libneedle.a`, a `needle` executable and `needle.h`, with **no `.so`**. Android is a static link like iOS: build your own shared library (CMake + NDK) and set `-Wl,-z,max-page-size=16384` yourself. The header has a sixth function, `needle_last_error`. See `needle_m0_results.md` and `needle_flutter_two_day_schedule.md`.
+
 The two Needle-3 rows in `needle3_implementation_plan.md` have been corrected to match.
 
 ---

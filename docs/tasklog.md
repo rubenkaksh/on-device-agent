@@ -4,7 +4,7 @@
 > Statuses: 🔴 Active / 🟡 Backlog / 🟠 Parked / ⚪ Descoped / ⚠️ User actions / 📋 Closed.
 > The `🤖 Autonomous queue` section is executor-owned — the orchestrator picks up `✅ Approved` cards.
 
-_Last updated: 2026-09-26 (N0–N8 Needle 3 cards added)_
+_Last updated: 2026-10-02 (N1–N8 engines assigned: hunter/flash; M0 done)_
 
 ## 🤖 Autonomous queue (executor-owned)
 > Routing tag controls cap multiplier: scr=tight (est×1.5+5), bld=standard (est×2+10), orc=generous (est×2+15).
@@ -14,14 +14,14 @@ _Last updated: 2026-09-26 (N0–N8 Needle 3 cards added)_
 | D2 | on-device-agent | 5 | | Make LLM response text selectable/copyable — long-press assistant message bubbles to copy full response to clipboard. | ✅ Done | scr |
 | D3 | on-device-agent | 3 | | Trim trailing whitespace/newlines from finalized assistant responses. | ✅ Done | scr |
 | N0 | on-device-agent | — | | **User-owned:** build the `needle_flutter` package per docs/needle_flutter_contribution_guide.md (M0–M7). Mobile engines exist, so Path A is chosen. Not for the executor. | 🟠 Parked | — |
-| N1 | on-device-agent | 45 | N0 | `ActionModel` interface + `ActionResolution` types + `FakeActionModel` in test/helpers (Phase 1). flutter analyze clean. | 🟡 Backlog | bld |
-| N2 | on-device-agent | 60 | N1 | Action registry: `ActionTool`, fixed + runtime registries, context filter, Needle tool-JSON serializer, demo actions (Phase 2). Unit tests. | 🟡 Backlog | bld |
-| N3 | on-device-agent | 120 | N0, N1 | Engine integration per chosen path: model manager (manifest, SHA-256, rollback), background isolate, lifecycle, response parsing (Phase 3). | 🟡 Backlog | orc |
-| N4 | on-device-agent | 60 | N2, N3 | Resolution pipeline: validator, confidence gate, confirm/missing-arg flow, destructive-action confirmation (Phase 4). Unit tests with fake. | 🟡 Backlog | bld |
-| N5 | on-device-agent | 60 | N4 | Learning B: sqflite correction memory, embedding/alias lookup, single-tool arg extraction on hit, clear-memory setting (Phase 5). | 🟡 Backlog | bld |
-| N6 | on-device-agent | 45 | N2 | Eval harness: golden set + Python eval script on Mac + on-device integration test (Phase 7). | 🟡 Backlog | bld |
-| N7 | on-device-agent | 60 | N5, N6 | Learning A: JSONL export, dataset build script, LoRA finetune/build commands, eval gate, manifest-based model update (Phase 6). | 🟡 Backlog | bld |
-| N8 | on-device-agent | 60 | N4 | UI: command bar, action result card (✓/✎), Notes/Reminders/Settings target screens, model state machine; retire GemmaService (Phase 8). | 🟡 Backlog | bld |
+| N1 | on-device-agent | 45 | | `ActionModel` interface + `ActionResolution` types + `FakeActionModel` in test/helpers (Phase 1). flutter analyze clean. | 🟡 Backlog | bld | Engine: hunter, one file per run (brief N1 in docs/needle_flutter_agent_briefs.md).
+| N2 | on-device-agent | 60 | N1 | Action registry: `ActionTool`, fixed + runtime registries, context filter, Needle tool-JSON serializer, demo actions (Phase 2). Unit tests. | 🟡 Backlog | bld | Engine: hunter, one file per run (after N1).
+| N3 | on-device-agent | 120 | N1, needle_flutter M3 | Engine integration per chosen path: model manager (manifest, SHA-256, rollback), background isolate, lifecycle, response parsing (Phase 3). | 🟡 Backlog | orc | Engine: flash (multi-file; only once the package API is stable).
+| N4 | on-device-agent | 60 | N2, N3 | Resolution pipeline: validator, confidence gate, confirm/missing-arg flow, destructive-action confirmation (Phase 4). Unit tests with fake. | 🟡 Backlog | bld | Engine: flash.
+| N5 | on-device-agent | 60 | N4 | Learning B: sqflite correction memory, embedding/alias lookup, single-tool arg extraction on hit, clear-memory setting (Phase 5). | 🟡 Backlog | bld | Engine: flash. Embeddings are 3072 floats (M0).
+| N6 | on-device-agent | 45 | | Eval harness: golden set + Python eval script on Mac + on-device integration test (Phase 7). | 🟡 Backlog | bld | Split: N6a (golden set + Python scorer) is hunter work now; the on-device integration test waits for M8.
+| N7 | on-device-agent | 60 | N5, N6 | Learning A: JSONL export, dataset build script, LoRA finetune/build commands, eval gate, manifest-based model update (Phase 6). | 🟡 Backlog | bld | Engine: hunter for the dataset-build script; owner runs training.
+| N8 | on-device-agent | 60 | N4 | UI: command bar, action result card (✓/✎), Notes/Reminders/Settings target screens, model state machine; retire GemmaService (Phase 8). | 🟡 Backlog | bld | Engine: flash (after N4).
 
 ## 📋 Closed / superseded
 - None yet.

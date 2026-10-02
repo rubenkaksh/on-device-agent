@@ -194,7 +194,7 @@ query
 
 - [ ] Phase 0 decision recorded with on-device numbers
 - [ ] p95 resolve latency < 300 ms on flagship (tune after spike)
-- [ ] Peak added RAM < 100 MB
+- [ ] Peak added RAM < 100 MB (M0 measured 128 MB peak in the macOS Python reference; re-baseline on a phone)
 - [ ] Action accuracy ≥ 90% and off-topic false-positive rate ≤ 5% on the golden set (base model)
 - [ ] LoRA model beats base on held-out test before shipping
 - [ ] A corrected query resolves correctly on its next use (memory B)

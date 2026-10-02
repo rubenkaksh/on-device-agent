@@ -87,29 +87,81 @@ Later milestones (M4 Android, M5 iOS, M6 wrapper parity, M7 publish) follow the 
 - Do not bundle `needle3.cact`; fetch with a pinned, hashed script.
 - Prebuilt `.so` alignment (16 KB) is not fixable by you; report it in the issue.
 
+## M0 results: what changed (2026-10-02, from `needle_m0_results.md`)
+
+M0 is **done** (hunter run H1). Facts that change the plan:
+
+1. **Android has no `.so`.** The Android folder holds a static `libneedle.a`, a stripped `needle`
+   executable and the header. So Android, like iOS and macOS, is a **static link**: you build your
+   own small shared library (CMake + NDK) that links `libneedle.a` and exports the 6 symbols. This
+   corrects guide section 0/6, which assumed a prebuilt `.so` in `jniLibs`.
+2. **16 KB alignment is now yours to set.** The measured 0x4000 is on the `needle` executable, not
+   on anything you ship. Build your `.so` with `-Wl,-z,max-page-size=16384` and check it with
+   `readelf -l`. The "report it in the issue" pitfall no longer applies, so reword Q6.
+3. **Six symbols, not five.** `needle_last_error` is in `needle.h` and in every `libneedle.a`. Use
+   it for error text instead of the output buffer (guide Q4).
+4. **The header says it plainly:** "One process-global, non-thread-safe model." That answers Q3:
+   one worker isolate, no concurrent calls. `needle_embed(NULL, ...)` returns the dimension.
+5. **Embedding dimension is 3072** floats (12 KB per vector). Phase 5 memory storage should keep
+   vectors as `Float32List` blobs and cap the row count.
+6. **Python reference on macOS:** `peak_ram_mb` 127.9 and `confidence` 0.1466 for a correct call.
+   The plan's "added RAM under 100 MB" target needs re-baselining on a phone.
+7. **Weights:** `needle3.cact` is 35,335,380 bytes (same on every platform); `libneedle.a` is
+   1.1-1.7 MB. Still no `.so`, so the package's iOS side links a static archive.
+8. **Still open:** Q2 (does `needle_load` copy its buffer), Q5 (telemetry on mobile) and Q7
+   (licence of binaries and weights). They go in the issue.
+
 ## Assignments: who does what
 
 Rule of thumb from the handoff: **you write** the FFI bindings, isolate protocol, native loading and
-public API. Everything else can go to a junior, run from the repo's directory, one file per run,
-reviewed by Sonnet before you keep it. Juniors never branch, commit, push or sign off.
+public API, and also the Android CMake/NDK glue and iOS linking (native loading). Everything else
+can go to a junior, run from the repo's directory, one file per run, reviewed by Sonnet before you
+keep it. Juniors never branch, commit, push or sign off. **Dispatch-ready briefs for every row are
+in `needle_flutter_agent_briefs.md`.**
 
-| ID | Task | Engine | When | Notes |
+Engines: **hunter** = free opencode agent, one file per run. **flash** = paid opencode agent for
+multi-file work; use it only when the work spans several files and the API it targets is stable.
+
+### Ready now (no package needed)
+
+| ID | Task | Engine | Output | Depends on |
 |---|---|---|---|---|
-| H1 | M0 exploration run: `needle build` for 4 platforms, `file`, header, ELF alignment, symbols, Python reference call, write `results.md` | hunter | **Dispatched 2026-09-30**, in `~/projects/needle-explore` | Facts only, no code. You copy the results into `docs/sessions/` and answer Q1, Q4, Q6, Q7 |
-| H2 | C stub engine for `dart test` (mirrors `tests/test_worker.py`) | hunter | After M0 (needs the real header) | Test scaffolding; one file |
-| H3 | `ffigen.yaml` | hunter | After M0 | One file; you run `ffigen` and read the output |
-| H4 | GitHub Actions workflow: `dart analyze`, `dart test` on macOS, `flutter build apk`, `flutter build ios --no-codesign` for the example | hunter | After the package repo exists | One file |
-| H5 | Example app shell (pubspec, `main.dart`, a screen with 3-5 tools) calling **your** API | hunter, several runs | After M3 (API exists) | One file per run |
-| H6 | Latency and RAM benchmark script for M4/M5 | hunter | After M3 | Measures only; you interpret |
-| H7 | README, CHANGELOG, NOTICE skeletons | hunter | M7 | You supply the measured numbers and edit for accuracy |
-| N1 | `ActionModel` + `ActionResolution` + `FakeActionModel` + tests (app-side, in `on-device-agent`) | hunter, one file per run | Any time; does not need the package | Tasklog card N1 |
-| N2 | Action registry + tool JSON serialiser | hunter, one file per run | After N1 | Tasklog card N2 |
-| N6 | Eval harness: golden set + Python eval script | hunter | Any time | Tasklog card N6 |
-| N3-N5 | Engine integration, resolution pipeline, correction memory (multi-file app phase) | **flash** | After M8 starts | Long-spanning, several files at once; costs money, so only once the package API is stable |
+| H1 | M0 exploration | hunter | `needle_m0_results.md` | **Done** |
+| H8 | Parity golden generator: Python script that runs a fixed list of (tools, query) pairs through `needle` and writes JSON envelopes | hunter | `tool/goldens/gen_goldens.py` + `goldens/*.json` | M0 |
+| H3 | `ffigen.yaml` for `needle.h` (6 functions, no helpers) | hunter | `ffigen.yaml` | M0 |
+| H2 | C stub engine mirroring `needle.h` and `tests/test_worker.py`, with a build script for macOS | hunter | `test/stub/needle_stub.c`, `test/stub/build.sh` | M0 |
+| H9 | Pinned, sha256-checked fetch script for engines + `needle3.cact`, adapted from `server_base/tool/fetch_needle.sh` for 4 platforms | hunter | `tool/fetch_needle.sh` | M0 |
+| H10 | Name check: is `needle_flutter` free on pub.dev, plus 3 fallback names | hunter | one-line result in `results.md` | none |
+| H11 | Telemetry check harness: mitmproxy addon + steps to run the macOS Python reference and later the example app behind it | hunter | `tool/telemetry/check.md`, `tool/telemetry/addon.py` | M0 |
+| N1 | `ActionModel`, `ActionResolution`, `FakeActionModel` + tests (on-device-agent) | hunter, one file per run | `lib/...`, `test/helpers/` | none |
+| N6a | Eval harness, Python side: golden set (>=20 queries per action, >=50 off-topic) + scorer script | hunter | `tool/needle/eval.jsonl`, `tool/needle/score.py` | none |
 
-**flash is not used yet.** Nothing in M0-M7 spans enough files to justify it; most of that work is
-yours by rule. cursor is suspended until 2026-10-29.
+### After the package repo exists
 
-Review: one batched Sonnet seat per unit (H2+H3 together, H5 together, and so on) rates each junior
-into `~/.claude/junior-ratings.md`. Marking: put "assisted by hunter" in the commit message of any
-junior-written file.
+| ID | Task | Engine | When |
+|---|---|---|---|
+| H4 | GitHub Actions: `dart analyze`, `dart test` on macOS with the stub, `flutter build apk`, `flutter build ios --no-codesign` for the example | hunter | New repo created |
+| N2 | Action registry + tool JSON serialiser (on-device-agent) | hunter, one file per run | After N1 |
+
+### After the API exists (M3)
+
+| ID | Task | Engine | When |
+|---|---|---|---|
+| H5 | Example app shell calling **your** API, one file per run | hunter, several runs | M3 |
+| H6 | Latency and RAM benchmark script (cold load, p50/p95, decode tps, RSS) | hunter | M3 |
+| H7 | README, CHANGELOG, NOTICE skeletons | hunter | M7, with your measured numbers |
+| N3-N5 | Engine integration, resolution pipeline, correction memory (several files at once) | **flash** | After M8 starts |
+| N7 | Learning A: dataset-build script + LoRA commands (run on your Mac) | hunter (script), you run training | After N5 |
+| N8 | UI: command bar, result card, target screens, state machine | **flash** | After N4 |
+
+### Yours (not for agents)
+
+M1 post the issue, M2-M3 bindings and isolate, Android CMake/NDK glue and `-z max-page-size`,
+iOS static-link setup, M6 wrapper logic, signing commits (`git commit -s`), publishing, M9.
+
+**flash is not used yet.** Nothing in M0-M7 spans enough files to justify it. cursor is suspended
+until 2026-10-29.
+
+Review: one batched Sonnet seat per unit (H2+H3 together, H8+H9 together, H5 together, and so on)
+rates each junior into `~/.claude/junior-ratings.md`. Marking: put "assisted by hunter" (or
+"assisted by flash") in the commit message of any junior-written file.
