@@ -1,6 +1,8 @@
 # Handoff — Needle 3 Flutter contribution (`needle_flutter`)
 
-_Written 2026-09-30. Read this first, then `needle_flutter_contribution_guide.md` for the technical detail._
+_Written 2026-09-30; status refreshed 2026-10-04. For the current state, decisions and next actions read `docs/sessions/2026-10-04.md` first. Then read `needle_flutter_contribution_guide.md` for the technical detail._
+
+> **Status 2026-10-04:** M0 is done. Android ships a static `libneedle.a` (no `.so`) and the header has six functions, not five, so §1's five-function list and §6's packaging notes are superseded by `needle_m0_results.md`. The issue is not posted yet and the package repo does not exist yet.
 
 ## 1. TL;DR
 
