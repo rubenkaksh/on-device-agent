@@ -4,7 +4,7 @@
 > Statuses: 🔴 Active / 🟡 Backlog / 🟠 Parked / ⚪ Descoped / ⚠️ User actions / 📋 Closed.
 > The `🤖 Autonomous queue` section is executor-owned — the orchestrator picks up `✅ Approved` cards.
 
-_Last updated: 2026-09-02 (D3 added)_
+_Last updated: 2026-10-14 (D4 added)_
 
 ## 🤖 Autonomous queue (executor-owned)
 > Routing tag controls cap multiplier: scr=tight (est×1.5+5), bld=standard (est×2+10), orc=generous (est×2+15).
@@ -13,6 +13,7 @@ _Last updated: 2026-09-02 (D3 added)_
 | D1 | on-device-agent | 45 | | Stop-token guardrails + generation cancellation: (1) configure stop tokens `<end_of_turn>`, `<eos>`, `<start_of_turn>` at engine level + temperature 0.2, (2) stream token interception — break on stop tokens, strip literal occurrences from output, (3) StreamSubscription lifecycle management with isGenerating state, (4) stopGeneration() cancel function bound to dispose/onDone/onError, (5) UI toggle — Send button becomes Stop while generating, input disabled during generation. flutter analyze clean. Commit + push to feature branch. | ✅ Done | bld |
 | D2 | on-device-agent | 5 | | Make LLM response text selectable/copyable — long-press assistant message bubbles to copy full response to clipboard. | ✅ Done | scr |
 | D3 | on-device-agent | 3 | | Trim trailing whitespace/newlines from finalized assistant responses. | ✅ Done | scr |
+| D4 | on-device-agent | 90 | | Side-by-side spike of `nobodywho` (pub.dev, llama.cpp/GGUF) vs current `flutter_gemma`, on a feature branch (no replacement): (1) extract an `LlmService` interface from `GemmaService` (stream of tokens, stopGeneration, dispose, isGenerating) and keep flutter_gemma as one implementation, (2) add `NobodyWhoService` implementing it (`flutter pub add nobodywho`, `NobodyWho.init()` in main, Gemma 2B GGUF via local path/huggingface), (3) backend switch in the UI or via env_config, (4) fake-backed tests in `test/helpers/`, no real platform channels, (5) write findings to `docs/sessions/nobodywho-spike.md` answering: how to cancel generation mid-stream, whether stop tokens/chat template are handled natively, Android GPU backend status, web unsupported, EUPL-1.2 implications, and a tokens/sec + RAM comparison table (device numbers left as TODO for manual run). `flutter analyze` clean. Commit + push to feature branch. | ✅ Approved | bld |
 
 ## 📋 Closed / superseded
 - None yet.
