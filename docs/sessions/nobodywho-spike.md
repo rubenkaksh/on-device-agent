@@ -54,6 +54,27 @@ Default model: `huggingface:unsloth/gemma-3n-E2B-it-GGUF/gemma-3n-E2B-it-Q4_K_M.
 - `isModelInstalled()` matches on file name only, not size or checksum, so a partial download would count as installed (unverified how nobodywho handles an interrupted download).
 - Download size for the Gemma 3n E2B Q4_K_M file is unchecked. Verify it fits the target device before testing.
 
+## macOS smoke test (2026-10-15)
+
+Apple Silicon Mac, macOS debug build (Metal), default model, `LLM_BACKEND=nobodywho`. Not representative of phone performance.
+
+| Check | Result |
+|---|---|
+| Build + launch (`flutter build macos`, `pod install` fetching Rust frameworks) | Pass |
+| Install card / download | Not exercised: the model was already cached, so the app opened straight to chat. A relaunch also skipped the card (indirect pass for the cached-model check). |
+| Streamed reply, no literal `<end_of_turn>` / `<eos>` / `<start_of_turn>` in UI | Pass |
+| Stop mid-stream | Pass: halted in about 1 s, input re-enabled. `stopGeneration()` works. |
+| Second prompt right after Stop | Pass |
+| Long-press copy | Pass ("Response copied to clipboard") |
+| Clear chat, then ask about earlier turns | Pass: model said it had no memory |
+| `literal stop token` log line | Never appeared across all runs |
+| Context fill / context shift | Inconclusive: five long essay prompts, no crash, but later prompts may have been sent while a reply was still generating and ignored, and no context-shift log was captured |
+| Gemma backend regression (2 to 7) | Not run |
+
+Speed (debug, Metal): ttft 113 to 162 ms, 43.6 to 44.4 chunks/s over 7 logged generations (one at 598 ms, a cold first run). Peak RAM was not measured.
+
+So the "stop tokens" and "cancel" answers in the findings table are now observed on macOS. Android GPU and the phone comparison remain open.
+
 ## Device comparison (TODO, manual)
 
 Fill in on the same physical Android device, same prompt, release or profile build, three runs each.
