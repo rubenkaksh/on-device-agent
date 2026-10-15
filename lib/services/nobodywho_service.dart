@@ -16,6 +16,12 @@ const List<String> _stopTokens = ['<end_of_turn>', '<eos>', '<start_of_turn>'];
 const String _defaultModel =
     'huggingface:unsloth/gemma-3n-E2B-it-GGUF/gemma-3n-E2B-it-Q4_K_M.gguf';
 
+/// `NobodyWho.init()` must run exactly once per process; a second call throws.
+/// Shared across service instances (the app can create several).
+Future<void>? _nativeInit;
+
+List<(String, BigInt)> _noCachedModels() => const [];
+
 /// The slice of nobodywho's `Chat` this service needs; faked in tests.
 abstract interface class NobodyWhoChat {
   Stream<String> ask(String message);
@@ -63,23 +69,28 @@ Future<NobodyWhoChat> _loadRealChat(
 /// [LlmService] backed by nobodywho (llama.cpp, GGUF models).
 ///
 /// nobodywho downloads and caches the model inside `Chat.fromPath`, so
-/// [installModel] both downloads and loads, and [isModelInstalled] is always
-/// false: the install card is shown on each launch and the "download" is a
-/// fast cache hit after the first run.
+/// [installModel] both downloads and loads. [isModelInstalled] looks for the
+/// model's file name in `getCachedModels()` so later launches skip the card.
 class NobodyWhoService implements LlmService {
-  NobodyWhoService({NobodyWhoChatLoader loader = _loadRealChat})
-    : _loader = loader;
+  NobodyWhoService({
+    NobodyWhoChatLoader loader = _loadRealChat,
+    List<(String, BigInt)> Function() cachedModels = nobodywho.getCachedModels,
+  }) : _loader = loader,
+       _cachedModels = cachedModels;
 
   @visibleForTesting
   NobodyWhoService.forTesting(
     NobodyWhoChat? chat, {
     NobodyWhoChatLoader loader = _loadRealChat,
+    List<(String, BigInt)> Function() cachedModels = _noCachedModels,
   }) : _loader = loader,
+       _cachedModels = cachedModels,
        _chat = chat,
        _isInitialized = true,
        _isModelLoaded = chat != null;
 
   final NobodyWhoChatLoader _loader;
+  final List<(String, BigInt)> Function() _cachedModels;
   NobodyWhoChat? _chat;
 
   bool _isInitialized = false;
@@ -107,12 +118,24 @@ class NobodyWhoService implements LlmService {
   @override
   Future<void> initialize() async {
     if (_isInitialized) return;
-    await nobodywho.NobodyWho.init();
+    await (_nativeInit ??= nobodywho.NobodyWho.init());
     _isInitialized = true;
   }
 
   @override
-  Future<bool> isModelInstalled() async => false;
+  Future<bool> isModelInstalled() async {
+    if (!_isInitialized) return false;
+    final modelPath = defaultModelUrl;
+    // Remote references are cached under their file name; local paths are
+    // used as-is.
+    final fileName = modelPath.split(RegExp(r'[/:]')).last;
+    try {
+      return _cachedModels().any((m) => m.$1.endsWith('/$fileName'));
+    } catch (e) {
+      debugPrint('NobodyWhoService: cache lookup failed: $e');
+      return false;
+    }
+  }
 
   @override
   Future<void> installModel({

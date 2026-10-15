@@ -128,6 +128,39 @@ void main() {
     });
   });
 
+  group('NobodyWhoService cache', () {
+    test('isModelInstalled matches the cached file name', () async {
+      final service = NobodyWhoService.forTesting(
+        null,
+        cachedModels: () => [
+          ('/cache/models/gemma-3n-E2B-it-Q4_K_M.gguf', BigInt.one),
+        ],
+      );
+
+      expect(await service.isModelInstalled(), isTrue);
+    });
+
+    test('isModelInstalled is false for other or no cached files', () async {
+      final other = NobodyWhoService.forTesting(
+        null,
+        cachedModels: () => [('/cache/models/other.gguf', BigInt.one)],
+      );
+      final empty = NobodyWhoService.forTesting(null);
+
+      expect(await other.isModelInstalled(), isFalse);
+      expect(await empty.isModelInstalled(), isFalse);
+    });
+
+    test('isModelInstalled survives a cache read error', () async {
+      final service = NobodyWhoService.forTesting(
+        null,
+        cachedModels: () => throw StateError('unreadable'),
+      );
+
+      expect(await service.isModelInstalled(), isFalse);
+    });
+  });
+
   group('createLlmService', () {
     test('defaults to gemma without .env', () {
       expect(createLlmService(), isA<GemmaService>());

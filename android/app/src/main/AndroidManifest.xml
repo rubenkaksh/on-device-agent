@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Model downloads (nobodywho huggingface: paths) need network in release builds. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="flutter_gemma_poc"
         android:name="${applicationName}"
