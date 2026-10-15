@@ -69,7 +69,7 @@ Apple Silicon Mac, macOS debug build (Metal), default model, `LLM_BACKEND=nobody
 | Clear chat, then ask about earlier turns | Pass: model said it had no memory |
 | `literal stop token` log line | Never appeared across all runs |
 | Context fill / context shift | Inconclusive: five long essay prompts, no crash, but later prompts may have been sent while a reply was still generating and ignored, and no context-shift log was captured |
-| Gemma backend regression (2 to 7) | **Blocked on macOS.** The ~2 GB download completed (needs `HF_TOKEN`; a 401 without it), then model install failed: `dlopen(LiteRtLm.framework/LiteRtLm)`: `libGemmaModelConstraintProvider.dylib` not loaded (`@rpath`). That dylib isn't in the pub packages or the built `.app`, so it looks like a `flutter_gemma_litertlm` macOS packaging gap. Not checked whether it predates D4 (needs the same build on the pre-D4 commit). Gemma regression on Android/iOS still untested. |
+| Gemma backend regression (2 to 7) | **Blocked on macOS.** The ~2 GB download completed (needs `HF_TOKEN`; a 401 without it), then model install failed: `dlopen(LiteRtLm.framework/LiteRtLm)`: `libGemmaModelConstraintProvider.dylib` not loaded (`@rpath`). That dylib isn't in the pub packages or the built `.app`, so it looks like a `flutter_gemma_litertlm` macOS packaging gap. **Predates D4:** the pre-D4 commit `7eb9dc4` (no nobodywho) fails with the identical error on macOS, so it is not a D4 regression. Gemma regression on Android/iOS still untested. |
 
 Speed (debug, Metal): ttft 113 to 162 ms, 43.6 to 44.4 chunks/s over 7 logged generations (one at 598 ms, a cold first run). Peak RAM was not measured.
 
