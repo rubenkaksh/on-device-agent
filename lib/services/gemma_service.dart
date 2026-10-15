@@ -5,6 +5,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_gemma_mediapipe/flutter_gemma_mediapipe.dart';
 import 'package:flutter_gemma_poc/config/env_config.dart';
+import 'package:flutter_gemma_poc/services/llm_service.dart';
 
 /// Stop tokens for Gemma models — generation halts when any is emitted.
 const List<String> _stopTokens = ['<end_of_turn>', '<eos>', '<start_of_turn>'];
@@ -13,7 +14,7 @@ const List<String> _stopTokens = ['<end_of_turn>', '<eos>', '<start_of_turn>'];
 ///
 /// Handles model installation, loading, and chat with streaming responses.
 /// Supports stop-token guardrails and generation cancellation.
-class GemmaService {
+class GemmaService implements LlmService {
   GemmaService();
 
   @visibleForTesting
@@ -27,6 +28,7 @@ class GemmaService {
 
   /// Whether a generation stream is currently active.
   bool _isGenerating = false;
+  @override
   bool get isGenerating => _isGenerating;
 
   Future<void>? _generationFuture;
@@ -34,13 +36,23 @@ class GemmaService {
 
   static const _modelFileType = ModelFileType.litertlm;
 
+  @override
+  String get displayName => 'Gemma';
+
+  @override
+  String get defaultModelUrl =>
+      'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm';
+
   /// Whether the service has been initialized (FlutterGemma.initialize called).
+  @override
   bool get isInitialized => _isInitialized;
 
   /// Whether a model is loaded and ready for inference.
+  @override
   bool get isModelLoaded => _isModelLoaded;
 
   /// Initialize the FlutterGemma plugin. Call once at app startup.
+  @override
   Future<void> initialize() async {
     if (_isInitialized) return;
     final hfToken = envValue('HF_TOKEN');
@@ -59,6 +71,7 @@ class GemmaService {
   /// [modelUrl] — URL to the `.litertlm` model file (e.g. HuggingFace direct
   /// link).
   /// [onProgress] — optional callback with download progress 0-100.
+  @override
   Future<void> installModel({
     required String modelUrl,
     void Function(int progress)? onProgress,
@@ -76,6 +89,7 @@ class GemmaService {
   }
 
   /// Check if a model is already installed (skip download).
+  @override
   Future<bool> isModelInstalled() async {
     if (!_isInitialized) return false;
     if (!FlutterGemma.hasActiveModel()) return false;
@@ -91,6 +105,7 @@ class GemmaService {
   /// Load the active model and create a chat session.
   ///
   /// Must be called after installModel() or if model is already installed.
+  @override
   Future<void> loadChat({int maxTokens = 1024}) async {
     if (!_isInitialized) {
       throw StateError('Call initialize() first.');
@@ -110,6 +125,7 @@ class GemmaService {
   /// stop-token text is stripped from the output.
   ///
   /// Call [stopGeneration] to cancel an in-flight stream.
+  @override
   Stream<String> sendMessageStream(String userMessage) {
     if (_chat == null) {
       throw StateError('Call loadChat() first.');
@@ -122,6 +138,7 @@ class GemmaService {
     _isGenerating = true;
     _stopRequested = false;
     final generationCompleter = Completer<void>();
+    final timer = GenerationTimer('GemmaService');
     _generationFuture = generationCompleter.future;
 
     () async {
@@ -141,6 +158,7 @@ class GemmaService {
           }
 
           if (response is TextResponse) {
+            timer.onChunk();
             var token = response.token;
 
             // Check if the token contains or is a stop token.
@@ -177,6 +195,7 @@ class GemmaService {
           controller.addError(e);
         }
       } finally {
+        timer.finish();
         _isGenerating = false;
         if (!controller.isClosed) {
           await controller.close();
@@ -194,6 +213,7 @@ class GemmaService {
   ///
   /// Signals the native engine to stop and waits for the stream to unwind.
   /// Safe to call when no generation is active (no-op).
+  @override
   Future<void> stopGeneration() async {
     if (!_isGenerating) return;
 
@@ -218,6 +238,7 @@ class GemmaService {
   }
 
   /// Clear conversation history and reset the chat session.
+  @override
   Future<void> clearChat() async {
     if (_chat != null) {
       await _chat!.clearHistory();
@@ -225,6 +246,7 @@ class GemmaService {
   }
 
   /// Dispose of model and chat resources.
+  @override
   Future<void> dispose() async {
     await stopGeneration();
     if (_model != null) {

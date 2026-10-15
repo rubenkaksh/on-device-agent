@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_gemma_poc/screens/chat_screen.dart';
-import 'package:flutter_gemma_poc/services/gemma_service.dart';
+import 'package:flutter_gemma_poc/services/llm_service.dart';
+import 'package:flutter_gemma_poc/services/llm_service_factory.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,7 +12,10 @@ Future<void> main() async {
 
 /// Root widget for the Gemma POC app.
 class GemmaPocApp extends StatelessWidget {
-  const GemmaPocApp({super.key});
+  const GemmaPocApp({super.key, this.llmService});
+
+  /// Backend override for tests; defaults to the `LLM_BACKEND` from `.env`.
+  final LlmService? llmService;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,7 @@ class GemmaPocApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: ChatScreen(gemmaService: GemmaService()),
+      home: ChatScreen(llmService: llmService ?? createLlmService()),
     );
   }
 }

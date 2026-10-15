@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_gemma_poc/services/gemma_service.dart';
+import 'package:flutter_gemma_poc/services/llm_service.dart';
 
 /// Chat screen for on-device Gemma inference.
 ///
 /// Shows model loading progress, message list with streaming tokens,
 /// and a text input for user prompts.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.gemmaService});
+  const ChatScreen({super.key, required this.llmService});
 
-  final GemmaService gemmaService;
+  final LlmService llmService;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -31,10 +31,6 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Subscription to the active generation stream — null when idle.
   StreamSubscription<String>? _generationSubscription;
 
-  // Default Gemma 2B model URL (MediaPipe's hosted .task file)
-  static const _defaultModelUrl =
-      'https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm';
-
   @override
   void initState() {
     super.initState();
@@ -48,12 +44,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      await widget.gemmaService.initialize();
+      await widget.llmService.initialize();
 
-      final installed = await widget.gemmaService.isModelInstalled();
+      final installed = await widget.llmService.isModelInstalled();
       if (installed) {
         setState(() => _loadingStatus = 'Loading model...');
-        await widget.gemmaService.loadChat();
+        await widget.llmService.loadChat();
         setState(() {
           _isLoadingModel = false;
           _loadingStatus = '';
@@ -82,8 +78,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      await widget.gemmaService.installModel(
-        modelUrl: _defaultModelUrl,
+      await widget.llmService.installModel(
+        modelUrl: widget.llmService.defaultModelUrl,
         onProgress: (progress) {
           setState(() {
             _downloadProgress = progress;
@@ -93,7 +89,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       setState(() => _loadingStatus = 'Loading model into memory...');
-      await widget.gemmaService.loadChat();
+      await widget.llmService.loadChat();
 
       setState(() {
         _isLoadingModel = false;
@@ -124,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     final buffer = StringBuffer();
-    final stream = widget.gemmaService.sendMessageStream(text);
+    final stream = widget.llmService.sendMessageStream(text);
 
     _generationSubscription = stream.listen(
       (token) {
@@ -180,7 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Stop the current generation — bound to the Stop button.
   Future<void> _stopGeneration() async {
-    await widget.gemmaService.stopGeneration();
+    await widget.llmService.stopGeneration();
     await _generationSubscription?.cancel();
     _generationSubscription = null;
 
@@ -199,7 +195,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _clearChat() async {
-    await widget.gemmaService.clearChat();
+    await widget.llmService.clearChat();
     setState(() {
       _messages.clear();
       _error = null;
@@ -233,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _generationSubscription?.cancel();
     _controller.dispose();
     _scrollController.dispose();
-    widget.gemmaService.dispose();
+    widget.llmService.dispose();
     super.dispose();
   }
 
@@ -243,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gemma Chat'),
+        title: Text('${widget.llmService.displayName} Chat'),
         centerTitle: true,
         actions: [
           if (_messages.isNotEmpty)
@@ -257,15 +253,19 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           // Model status / install section
-          if (!widget.gemmaService.isModelLoaded && !_isLoadingModel)
-            _ModelInstallCard(onInstall: _installAndLoadModel, error: _error),
+          if (!widget.llmService.isModelLoaded && !_isLoadingModel)
+            _ModelInstallCard(
+              backendName: widget.llmService.displayName,
+              onInstall: _installAndLoadModel,
+              error: _error,
+            ),
 
           // Loading indicator
           if (_isLoadingModel)
             _LoadingCard(status: _loadingStatus, progress: _downloadProgress),
 
           // Error banner
-          if (_error != null && widget.gemmaService.isModelLoaded)
+          if (_error != null && widget.llmService.isModelLoaded)
             _ErrorBanner(
               message: _error!,
               onDismiss: () => setState(() => _error = null),
@@ -276,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _messages.isEmpty
                 ? Center(
                     child: Text(
-                      widget.gemmaService.isModelLoaded
+                      widget.llmService.isModelLoaded
                           ? 'Send a message to start chatting'
                           : 'Install the model to begin',
                       style: theme.textTheme.bodyLarge?.copyWith(
@@ -304,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
 
           // Input area
-          if (widget.gemmaService.isModelLoaded)
+          if (widget.llmService.isModelLoaded)
             _InputBar(
               controller: _controller,
               isGenerating: _isGenerating,
@@ -334,8 +334,13 @@ class _ChatMessage {
 }
 
 class _ModelInstallCard extends StatelessWidget {
-  const _ModelInstallCard({required this.onInstall, this.error});
+  const _ModelInstallCard({
+    required this.backendName,
+    required this.onInstall,
+    this.error,
+  });
 
+  final String backendName;
   final VoidCallback onInstall;
   final String? error;
 
@@ -352,10 +357,10 @@ class _ModelInstallCard extends StatelessWidget {
           children: [
             Icon(Icons.smart_toy, size: 48, color: theme.colorScheme.primary),
             const SizedBox(height: 12),
-            Text('Gemma 2B On-Device', style: theme.textTheme.titleMedium),
+            Text('$backendName On-Device', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
-              'Download and run the Gemma 2B model locally. '
+              'Download and run the Gemma model locally with $backendName. '
               'No data leaves your device.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall,

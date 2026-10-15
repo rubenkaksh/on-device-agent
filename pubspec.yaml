@@ -38,6 +38,7 @@ dependencies:
   flutter_gemma: ^1.7.0
   flutter_gemma_mediapipe: ^1.0.5
   flutter_gemma_litertlm: ^1.6.1
+  nobodywho: ^5.1.0
 
 dev_dependencies:
   flutter_test:
