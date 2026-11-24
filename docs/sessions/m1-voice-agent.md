@@ -42,16 +42,31 @@ All of them can also be injected through `GemmaPocApp(...)` (used by tests).
 
 ## Mac test checklist
 
-- [ ] `flutter pub get` (adds `speech_to_text`), `cd ios && pod install`
-- [ ] `flutter analyze` clean, `flutter test` green (not runnable in the cloud
-      session that wrote this — pub.dev was unreachable there)
-- [ ] Run on a physical iPhone; first launch downloads FunctionGemma (~284 MB)
-- [ ] Allow Microphone, Speech Recognition and Reminders prompts
-- [ ] "Remind me to call mom tomorrow at 5pm" → appears in Apple Reminders
-- [ ] "What are my reminders?" → lists it
-- [ ] "Mark call mom as done" → completed in Apple Reminders
-- [ ] Airplane mode: all three still work
-- [ ] Record accuracy misses here → candidates for a FunctionGemma fine-tune
+Run 2026-11-24 on a Mac (Flutter 3.47.5, Xcode, CocoaPods 1.16.2).
+
+Build gates (verified):
+
+- [x] `flutter pub get`: resolved, speech_to_text 7.5.0, no changes needed
+- [x] `flutter analyze`: no issues, first run
+- [x] `flutter test`: all passed (agent, natural_date_parser, widget + D4 tests)
+- [x] `pod install`: needed `platform :ios, '16.0'` and
+      `use_frameworks! :linkage => :static` (MediaPipe static xcframeworks)
+- [x] `flutter build ios --profile`: compiles, incl. Swift EventKit bridge
+- [x] Signed with the local Apple Development identity, install started on
+      iPhone 13 Pro over wireless debugging (iOS 27.2.1)
+
+Device checklist (items 1-12 of M1-mac-handoff.md): **not verified.** They need
+a person at the phone (mic, speech, Reminders prompts, airplane mode). The
+install/launch step had not confirmed the app opened when this was written.
+
+| # | Item | Result |
+|---|---|---|
+| 1-12 | all device items | not verified |
+
+## Accuracy log
+
+Not run: needs the app running on the device. Table to fill (utterance |
+`ToolCallDecision` | correct?).
 
 ## Next (M2 candidates)
 
