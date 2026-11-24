@@ -63,11 +63,12 @@ class Agent {
       );
     }
 
+    _log('Agent: heard "$input"');
     final AgentDecision decision;
     try {
       decision = await model.decide(input, now: _clock());
     } catch (e) {
-      debugPrint('Agent: model failed: $e');
+      _log('Agent: model failed: $e');
       return AgentTurn(
         utterance: input,
         reply: 'The model failed to respond: $e',
