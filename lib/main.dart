@@ -18,6 +18,7 @@ import 'package:flutter_gemma_poc/speech/speech_input_factory.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(isOptional: true);
+  appendAgentLog('App: started ${DateTime.now().toIso8601String()}');
   runApp(const GemmaPocApp());
 }
 
