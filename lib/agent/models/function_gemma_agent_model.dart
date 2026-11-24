@@ -93,7 +93,10 @@ class FunctionGemmaAgentModel implements AgentModel {
   }
 
   @override
-  Future<AgentDecision> decide(String utterance, {required DateTime now}) async {
+  Future<AgentDecision> decide(
+    String utterance, {
+    required DateTime now,
+  }) async {
     final chat = _chat;
     if (chat == null) throw StateError('Call load() first.');
 
@@ -102,6 +105,9 @@ class FunctionGemmaAgentModel implements AgentModel {
     if (previous != null) await previous;
 
     final run = () async {
+      // Every utterance is decided alone; don't trust the plugin to have
+      // dropped the previous turn's state.
+      await chat.clearHistory();
       await chat.addQuery(Message.text(text: utterance, isUser: true));
       return chat.generateChatResponse();
     }();
