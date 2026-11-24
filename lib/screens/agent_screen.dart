@@ -324,7 +324,7 @@ class _TurnTile extends StatelessWidget {
                 children: [
                   if (toolName != null)
                     Text(
-                      toolName,
+                      '$toolName ${turn.toolArgs}',
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                   Text(turn.reply),
