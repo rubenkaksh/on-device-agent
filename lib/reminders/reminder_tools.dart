@@ -59,13 +59,12 @@ class CreateReminderTool extends AgentTool {
     'properties': {
       'title': {
         'type': 'string',
-        'description': 'What to be reminded about, e.g. "call mom".',
+        'description': 'What the user wants to be reminded about.',
       },
       'due': {
         'type': 'string',
         'description':
-            'When, in the user\'s own words, e.g. "tomorrow at 5pm" or '
-            '"in 20 minutes". Empty if not given.',
+            'When, copied from the user\'s own words. Empty if not given.',
       },
     },
     'required': ['title'],
