@@ -65,8 +65,29 @@ install/launch step had not confirmed the app opened when this was written.
 
 ## Accuracy log
 
-Not run: needs the app running on the device. Table to fill (utterance |
-`ToolCallDecision` | correct?).
+Source: `Documents/agent_log.txt` pulled from the iPhone (2026-11-24). "Heard" is
+what speech-to-text produced. Tool = did the model pick the right tool; args =
+were its arguments usable as given.
+
+| Heard | Model call | Tool | Args |
+|---|---|---|---|
+| Remind me to buy milk Friday morning | create_reminder {title: buy milk Friday morning, due: 2024-05-22T12:00:00} | right | due invented (past ISO) |
+| Mark call mom as Jan (STT miss) | create_reminder {title: Mom not coming, due: 2024-05-24...} | wrong | n/a |
+| Mark call mom has done (STT miss) | complete_reminder {title: Mom has done} | right | paraphrased |
+| Mark call mom as done | complete_reminder {title: Mom not done} | right | paraphrased |
+| Call mom as done | complete_reminder {title: Mom} | right | truncated |
+| Complete all reminders call mom as done | complete_reminder {title: Mom} | right | truncated |
+| All | complete_reminder {title: All} | n/a | n/a |
+| Call mom | create_reminder {title: Mom's Reminder, due: 2024-05-14...} | right | due invented |
+
+Findings: tool choice was right 5 of 6 clear cases; arguments were unreliable.
+The model invents past ISO `due` values and paraphrases titles. Mitigation
+(commit "resolve dates from the utterance"): tools receive the raw utterance;
+dates are parsed from it and past model dates are ignored; `complete_reminder`
+falls back to a title that appears in the utterance. After the fix on device:
+"buy milk Friday morning" -> Nov 27 9:00 AM; "Mark call mom as done" -> marked
+"call mom" done. Two speech-to-text misses ("as Jan", "has done") are not the
+agent's fault. Remaining device checklist items stay not verified.
 
 ## Next (M2 candidates)
 
