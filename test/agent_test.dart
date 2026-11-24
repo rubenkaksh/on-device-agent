@@ -99,4 +99,45 @@ void main() {
     final text = await agent.handle('tell me a joke');
     expect(text.reply, 'I can only manage reminders for now.');
   });
+
+  test('ignores an invented past ISO due and uses what was said', () async {
+    final agent = agentWith([
+      const ToolCallDecision('create_reminder', {
+        'title': 'buy milk Friday morning',
+        'due': '2024-05-22T12:00:00',
+      }),
+    ]);
+
+    await agent.handle('Remind me to buy milk Friday morning');
+
+    final open = await store.listOpen();
+    expect(open.single.title, 'buy milk');
+    expect(open.single.due, DateTime(2026, 11, 27, 9));
+  });
+
+  test('complete falls back to a title found in the utterance', () async {
+    await store.create(title: 'call mom');
+    await store.create(title: 'pay rent');
+    final agent = agentWith([
+      const ToolCallDecision('complete_reminder', {'title': 'Mom not done'}),
+    ]);
+
+    final turn = await agent.handle('Mark call mom as done');
+
+    expect(turn.isSuccess, isTrue);
+    expect((await store.listOpen()).map((r) => r.title), ['pay rent']);
+  });
+
+  test('complete takes one of several identically titled reminders', () async {
+    await store.create(title: 'call mom');
+    await store.create(title: 'call mom');
+    final agent = agentWith([
+      const ToolCallDecision('complete_reminder', {'title': 'Mom'}),
+    ]);
+
+    final turn = await agent.handle('Call mom as done');
+
+    expect(turn.isSuccess, isTrue);
+    expect((await store.listOpen()).length, 1);
+  });
 }

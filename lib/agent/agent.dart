@@ -95,7 +95,10 @@ class Agent {
           );
         }
         try {
-          final result = await tool.execute(args);
+          final result = await tool.execute({
+            ...args,
+            AgentTool.utteranceArg: input,
+          });
           _log('Agent: result ok=${result.isSuccess} "${result.message}"');
           return AgentTurn(
             utterance: input,

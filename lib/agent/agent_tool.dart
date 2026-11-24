@@ -7,6 +7,11 @@
 abstract class AgentTool {
   const AgentTool();
 
+  /// Key under which the agent passes the user's own words to [execute].
+  /// Small models garble or invent arguments; tools may use the raw
+  /// utterance as the source of truth for things like dates.
+  static const utteranceArg = '_utterance';
+
   /// Snake-case function name the model calls, e.g. `create_reminder`.
   String get name;
 

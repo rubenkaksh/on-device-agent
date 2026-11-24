@@ -76,14 +76,21 @@ class CreateReminderTool extends AgentTool {
     var title = args['title']?.toString().trim() ?? '';
     final dueText = args['due']?.toString().trim() ?? '';
 
-    DateTime? due = parser.parse(dueText, now: now)?.when;
-    // Small models sometimes leave the time inside the title.
+    // The user's own words are the source of truth: the 270M model invents
+    // ISO dates (often years in the past) instead of copying what was said.
+    final spoken = args[AgentTool.utteranceArg]?.toString() ?? '';
+    DateTime? due = spoken.isEmpty
+        ? null
+        : parser.parse(spoken, now: now)?.when;
     if (due == null) {
-      final fromTitle = parser.parse(title, now: now);
-      if (fromTitle != null && fromTitle.remainder.isNotEmpty) {
-        due = fromTitle.when;
-        title = fromTitle.remainder;
-      }
+      final fromModel = parser.parse(dueText, now: now)?.when;
+      if (fromModel != null && fromModel.isAfter(now)) due = fromModel;
+    }
+    // Small models sometimes leave the time inside the title.
+    final fromTitle = parser.parse(title, now: now);
+    if (fromTitle != null && fromTitle.remainder.isNotEmpty) {
+      due ??= fromTitle.when;
+      title = fromTitle.remainder;
     }
     title = title.replaceFirst(
       RegExp(r'^(?:to|that)\s+', caseSensitive: false),
@@ -197,11 +204,25 @@ class CompleteReminderTool extends AgentTool {
       );
     }
     final open = await store.listOpen();
-    final matches = open
+    var matches = open
         .where((r) => r.title.toLowerCase().contains(query))
         .toList();
     if (matches.isEmpty) {
+      // The model often paraphrases the title ("mom not done"). Fall back to
+      // reminders whose full title appears in what the user actually said.
+      final spoken =
+          args[AgentTool.utteranceArg]?.toString().toLowerCase() ?? '';
+      matches = spoken.isEmpty
+          ? []
+          : open.where((r) => spoken.contains(r.title.toLowerCase())).toList();
+    }
+    if (matches.isEmpty) {
       return ToolResult.failure('No open reminder matches "$query".');
+    }
+    // Several reminders with the very same title: complete one at a time.
+    final distinct = matches.map((r) => r.title.toLowerCase()).toSet();
+    if (matches.length > 1 && distinct.length == 1) {
+      matches = [matches.first];
     }
     if (matches.length > 1) {
       final titles = matches.map((r) => '"${r.title}"').join(', ');
