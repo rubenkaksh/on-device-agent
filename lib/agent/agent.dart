@@ -26,12 +26,24 @@ class AgentTurn {
 /// Knows nothing about speech, models or storage specifics — each is injected,
 /// so any of them can be swapped independently.
 class Agent {
-  Agent({required this.model, required this.tools, DateTime Function()? clock})
-    : _clock = clock ?? DateTime.now;
+  Agent({
+    required this.model,
+    required this.tools,
+    DateTime Function()? clock,
+    this.onLog,
+  }) : _clock = clock ?? DateTime.now;
 
   final AgentModel model;
   final ToolRegistry tools;
   final DateTime Function() _clock;
+
+  /// Receives one line per decision/result, for accuracy logging.
+  final void Function(String line)? onLog;
+
+  void _log(String line) {
+    debugPrint(line);
+    onLog?.call(line);
+  }
 
   Future<void> prepare({void Function(int progress)? onProgress}) async {
     await model.initialize();
@@ -62,7 +74,7 @@ class Agent {
         isSuccess: false,
       );
     }
-    debugPrint('Agent: $decision');
+    _log('Agent: "$input" (now=${_clock().toIso8601String()}) -> $decision');
 
     switch (decision) {
       case TextDecision(:final text):
@@ -83,6 +95,7 @@ class Agent {
         }
         try {
           final result = await tool.execute(args);
+          _log('Agent: result ok=${result.isSuccess} "${result.message}"');
           return AgentTurn(
             utterance: input,
             reply: result.message,

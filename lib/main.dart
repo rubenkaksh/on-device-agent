@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_gemma_poc/agent/agent.dart';
+import 'package:flutter_gemma_poc/agent/agent_log.dart';
 import 'package:flutter_gemma_poc/agent/agent_model.dart';
 import 'package:flutter_gemma_poc/agent/agent_tool.dart';
 import 'package:flutter_gemma_poc/agent/models/agent_model_factory.dart';
@@ -47,6 +48,7 @@ class GemmaPocApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final agent = Agent(
       model: agentModel ?? createAgentModel(),
+      onLog: appendAgentLog,
       tools: ToolRegistry(
         reminderTools(reminderStore ?? createReminderStore()),
       ),
