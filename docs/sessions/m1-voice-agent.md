@@ -55,13 +55,21 @@ Build gates (verified):
 - [x] Signed with the local Apple Development identity, install started on
       iPhone 13 Pro over wireless debugging (iOS 27.2.1)
 
-Device checklist (items 1-12 of M1-mac-handoff.md): **not verified.** They need
-a person at the phone (mic, speech, Reminders prompts, airplane mode). The
-install/launch step had not confirmed the app opened when this was written.
+Device checklist, from `agent_log.txt` plus what the user reported. Items the
+log cannot show (chat screen, alert firing) are not verified.
 
-| # | Item | Result |
-|---|---|---|
-| 1-12 | all device items | not verified |
+| Item | Result |
+|---|---|
+| Mic + speech-to-text to agent | pass (STT misheard "as done" twice; not the agent) |
+| Create reminder with date ("buy milk Friday morning") | pass after fix: Nov 27 9:00 AM |
+| Complete reminder ("Mark call mom as done") | pass after fix |
+| List reminders (spoken "what are my reminders", "My reminders") | pass |
+| Unsupported request ("tell me a joke") | pass: text reply, no crash (wordy refusal) |
+| Airplane mode: create "call dad tomorrow at 3 PM", list, complete | pass: all three worked offline, due parsed as tomorrow 3:00 PM |
+| Reminders permission denied | pass: "I need Reminders access. Enable it in Settings.", no crash |
+| "remind me to stretch in 20 minutes" + alert fires | not verified: no such utterance in the log |
+| Chat screen round trip (Gemma install card, agent still answers) | not verified: chat is not logged |
+| No model re-download on relaunch | not verified on screen; app relaunched 4 times with no install step in the log |
 
 ## Accuracy log
 
@@ -87,7 +95,12 @@ dates are parsed from it and past model dates are ignored; `complete_reminder`
 falls back to a title that appears in the utterance. After the fix on device:
 "buy milk Friday morning" -> Nov 27 9:00 AM; "Mark call mom as done" -> marked
 "call mom" done. Two speech-to-text misses ("as Jan", "has done") are not the
-agent's fault. Remaining device checklist items stay not verified.
+agent's fault.
+
+Open bug: when the user gives no time ("Remind me to test denial") the model
+still invents a past ISO `due`, and the reply wrongly says "I couldn't
+understand '2024-06-01T12:00:00', so it has no time." The reminder itself is
+correct. Fix: only show that note when the utterance contained a time.
 
 ## Next (M2 candidates)
 
