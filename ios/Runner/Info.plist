@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Flutter Gemma Poc</string>
+	<string>On-Device Agent</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -41,6 +41,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The assistant listens to your voice commands, such as adding reminders.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Your speech is turned into text on this device so the assistant can act on it.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>The assistant adds and reads reminders in Apple Reminders for you.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>The assistant adds, reads and completes reminders in Apple Reminders for you.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

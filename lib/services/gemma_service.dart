@@ -97,7 +97,10 @@ class GemmaService implements LlmService {
     final activeModel =
         FlutterGemmaPlugin.instance.modelManager.activeInferenceModel;
     return switch (activeModel) {
-      InferenceModelSpec spec => spec.fileType == _modelFileType,
+      // modelType check: the agent screen may have activated FunctionGemma,
+      // which shares the .litertlm file type.
+      InferenceModelSpec spec =>
+        spec.fileType == _modelFileType && spec.modelType == ModelType.gemmaIt,
       _ => false,
     };
   }
