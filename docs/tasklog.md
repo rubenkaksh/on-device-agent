@@ -4,7 +4,7 @@
 > Statuses: 🔴 Active / 🟡 Backlog / 🟠 Parked / ⚪ Descoped / ⚠️ User actions / 📋 Closed.
 > The `🤖 Autonomous queue` section is executor-owned — the orchestrator picks up `✅ Approved` cards.
 
-_Last updated: 2026-10-15 (D4 done)_
+_Last updated: 2026-11-27 (M1 merged; needle3 + D4 docs merged)_
 
 ## 🤖 Autonomous queue (executor-owned)
 > Routing tag controls cap multiplier: scr=tight (est×1.5+5), bld=standard (est×2+10), orc=generous (est×2+15).
@@ -23,6 +23,7 @@ _Last updated: 2026-10-15 (D4 done)_
 | N6 | on-device-agent | 45 | | Eval harness: golden set + Python eval script on Mac + on-device integration test (Phase 7). | 🟡 Backlog | bld | Split: N6a (golden set + Python scorer) is hunter work now; the on-device integration test waits for M8.
 | N7 | on-device-agent | 60 | N5, N6 | Learning A: JSONL export, dataset build script, LoRA finetune/build commands, eval gate, manifest-based model update (Phase 6). | 🟡 Backlog | bld | Engine: hunter for the dataset-build script; owner runs training.
 | N8 | on-device-agent | 60 | N4 | UI: command bar, action result card (✓/✎), Notes/Reminders/Settings target screens, model state machine; retire GemmaService (Phase 8). | 🟡 Backlog | bld | Engine: flash (after N4).
+| M1 | on-device-agent | 120 | | Voice reminder agent MVP: plug-and-play `AgentModel` (FunctionGemma 270M default), `SpeechInput` (native on-device STT), `ReminderStore` (Apple Reminders via EventKit), `AgentTool`s create/list/complete reminder, agent screen with mic + text fallback, fake-backed tests. See `docs/sessions/m1-voice-agent.md`. `flutter analyze` clean on Mac. Draft PR. Device-tested 2026-11-24 (see session doc; stretch alert and chat screen unverified). | ✅ Done (merged 2026-11-27) | bld |
 
 ## 📋 Closed / superseded
 - None yet.
